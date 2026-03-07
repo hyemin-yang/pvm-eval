@@ -32,3 +32,9 @@ class InvalidPromptTemplateError(PVMError):
     """Raised when a prompt YAML template fails validation."""
 
     pass
+
+
+class InvalidVersionError(PVMError):
+    """Raised when a version string is not a valid semantic version."""
+
+    pass

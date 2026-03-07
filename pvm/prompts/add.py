@@ -12,16 +12,18 @@ from pvm.prompts.common import (
 from pvm.storage.checksum import sha256_data
 from pvm.storage.history import append_history
 from pvm.storage.json_io import dump_json, write_text
+from pvm.storage.semver import semver_sort_key
 from pvm.storage.time import utc_now_iso
 from pvm.storage.yaml_io import dump_yaml
 
 
 def add_prompt(root: Path, template_path: Path, bump_level: str = "patch") -> dict[str, Any]:
     """Store a prompt YAML template as a new immutable version artifact."""
-    paths = ProjectPaths(root.resolve())
-    template = load_prompt_template(template_path.resolve())
+    resolved_root = root.resolve()
+    resolved_template_path = template_path.resolve()
+    paths = ProjectPaths(resolved_root)
+    template = load_prompt_template(resolved_template_path)
     prompt_id = template["id"]
-    prompt_dir = paths.prompt_dir(prompt_id)
     versions_dir = paths.prompt_versions_dir(prompt_id)
     history_file = paths.prompt_history_file(prompt_id)
     info_file = paths.prompt_info_file(prompt_id)
@@ -30,7 +32,13 @@ def add_prompt(root: Path, template_path: Path, bump_level: str = "patch") -> di
     if not history_file.exists():
         write_text(history_file, "")
 
-    next_version = get_next_prompt_version(paths, prompt_id, bump_level=bump_level)
+    existing_versions = [path.name for path in versions_dir.iterdir() if path.is_dir()]
+    next_version = get_next_prompt_version(
+        paths,
+        prompt_id,
+        bump_level=bump_level,
+        versions=existing_versions,
+    )
     checksum_payload = {
         "prompt": template["prompt"],
         "llm": template["llm"],
@@ -39,11 +47,8 @@ def add_prompt(root: Path, template_path: Path, bump_level: str = "patch") -> di
     }
     template_checksum = sha256_data(checksum_payload)
 
-    existing_versions = [path.name for path in versions_dir.iterdir() if path.is_dir()]
     if existing_versions:
-        latest_version = sorted(
-            existing_versions, key=lambda value: tuple(int(part) for part in value.split("."))
-        )[-1]
+        latest_version = sorted(existing_versions, key=semver_sort_key)[-1]
         latest_metadata = read_prompt_metadata(paths, prompt_id, latest_version)
         if latest_metadata["template_checksum"] == template_checksum:
             return {
@@ -71,7 +76,7 @@ def add_prompt(root: Path, template_path: Path, bump_level: str = "patch") -> di
             "description": template.get("description", ""),
             "author": template.get("author", ""),
             "created_at": created_at,
-            "source_file": str(template_path),
+            "source_file": _source_file_value(resolved_root, resolved_template_path),
             "prompt_checksum": prompt_checksum,
             "model_config_checksum": model_config_checksum,
             "template_checksum": template_checksum,
@@ -105,3 +110,11 @@ def add_prompt(root: Path, template_path: Path, bump_level: str = "patch") -> di
         "version": next_version,
         "changed": True,
     }
+
+
+def _source_file_value(root: Path, template_path: Path) -> str:
+    """Store a stable source file reference for metadata."""
+    try:
+        return str(template_path.relative_to(root))
+    except ValueError:
+        return template_path.name

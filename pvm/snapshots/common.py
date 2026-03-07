@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pvm.core.errors import VersionNotFoundError
 from pvm.core.paths import ProjectPaths
-from pvm.storage.semver import bump_major, bump_minor, bump_patch
+from pvm.storage.semver import bump_major, bump_minor, bump_patch, parse_semver, semver_sort_key
 
 
 INITIAL_VERSION = "0.1.0"
@@ -19,7 +19,7 @@ def list_snapshot_versions(paths: ProjectPaths) -> list[str]:
         for path in paths.snapshot_versions_dir.iterdir()
         if path.is_file() and path.suffix == ".json"
     ]
-    return sorted(versions, key=lambda value: tuple(int(part) for part in value.split(".")))
+    return sorted(versions, key=semver_sort_key)
 
 
 def get_next_snapshot_version(paths: ProjectPaths, bump_level: str = "patch") -> str:
@@ -37,6 +37,7 @@ def get_next_snapshot_version(paths: ProjectPaths, bump_level: str = "patch") ->
 
 def ensure_snapshot_exists(paths: ProjectPaths, version: str) -> None:
     """Raise if a snapshot version does not exist."""
+    parse_semver(version)
     snapshot_file = paths.snapshot_versions_dir / f"{version}.json"
     if not snapshot_file.exists():
         raise VersionNotFoundError(f"Snapshot version not found: {version}")
