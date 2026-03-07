@@ -10,10 +10,16 @@ from pvm.core.errors import NotValidProjectError
 from pvm.core.paths import ProjectPaths
 from pvm.prompts.add import add_prompt
 from pvm.prompts.deploy import deploy_prompt
+from pvm.prompts.diff import diff_prompt_versions
 from pvm.prompts.get import get_prompt
 from pvm.prompts.get_info import get_prompt_info
 from pvm.prompts.list_ids import list_prompt_ids, list_prompt_versions_for_id
 from pvm.prompts.rollback import rollback_prompt
+from pvm.snapshots.create import create_snapshot
+from pvm.snapshots.diff import diff_snapshots
+from pvm.snapshots.get import get_snapshot
+from pvm.snapshots.list import list_snapshots
+from pvm.snapshots.read import read_snapshot
 
 
 class PVMProject:
@@ -102,3 +108,35 @@ class PVMProject:
         """Rollback a prompt to the previous production version."""
         self.require_valid()
         return rollback_prompt(self.root, prompt_id)
+
+    def diff_prompt(
+        self, prompt_id: str, from_version: str, to_version: str
+    ) -> dict[str, Any]:
+        """Compare two versions of the same prompt."""
+        self.require_valid()
+        return diff_prompt_versions(self.root, prompt_id, from_version, to_version)
+
+    def create_snapshot(self) -> dict[str, Any]:
+        """Create a snapshot from the current production prompt set."""
+        self.require_valid()
+        return create_snapshot(self.root)
+
+    def list_snapshots(self) -> list[str]:
+        """List snapshot versions in the current project."""
+        self.require_valid()
+        return list_snapshots(self.root)
+
+    def get_snapshot(self, version: str) -> dict[str, Any]:
+        """Load a snapshot manifest by version."""
+        self.require_valid()
+        return get_snapshot(self.root, version)
+
+    def read_snapshot(self, version: str) -> dict[str, Any]:
+        """Expand a snapshot into the prompt contents it references."""
+        self.require_valid()
+        return read_snapshot(self.root, version)
+
+    def diff_snapshot(self, from_version: str, to_version: str) -> dict[str, Any]:
+        """Compare two snapshots by prompt membership and version mapping."""
+        self.require_valid()
+        return diff_snapshots(self.root, from_version, to_version)

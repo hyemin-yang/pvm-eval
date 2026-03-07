@@ -20,6 +20,8 @@
 - 프로젝트의 공식 식별자는 `.pvm/config.yaml`에 저장된 `project_id`다.
 - `project_id`는 `init` 시 자동 생성되는 ULID다.
 - 현재 디렉토리에 `.pvm/`가 없으면 `Not Valid Project`
+- `Not Valid Project` 판정은 `.pvm/` 존재만이 아니라 최소 필수 구조 존재 여부까지 확인한다.
+- 최소 필수 구조는 `.pvm/config.yaml`, `.pvm/settings/template.yaml`, `.pvm/prompts/`, `.pvm/snapshots/versions/`, `.pvm/snapshots/history.jsonl`이다.
 - 부모 디렉토리 탐색은 하지 않는다.
 
 ### Prompt
@@ -670,13 +672,14 @@ MVP 구현은 아래 순서로 진행한다.
 구현 방법:
 
 - `PVMProject.cwd()`는 현재 작업 디렉토리를 root로 갖는 객체를 반환한다.
-- `PVMProject.require_valid()` 또는 유사한 내부 메서드에서 `.pvm/` 존재를 검사한다.
+- `PVMProject.require_valid()` 또는 유사한 내부 메서드에서 최소 필수 `.pvm/` 구조 존재를 검사한다.
 - `init`는 현재 디렉토리에 `.pvm/`가 이미 있으면 `AlreadyInitializedError`를 발생시키거나 no-op 정책을 명확히 정한다.
 - `init`는 `config.yaml` 생성 시 `project_id`, `name`, `created_at`를 함께 기록한다.
 - `project_id`는 ULID로 자동 생성한다.
 - 기본 디렉토리는 `mkdir(parents=True, exist_ok=False)`로 생성해 초기화 중복을 방지한다.
 - 기본 파일은 템플릿 문자열 또는 딕셔너리를 YAML/JSON으로 직렬화해 쓴다.
 - `settings/template.yaml`에는 사용자가 바로 복사해 쓸 수 있는 base prompt 템플릿을 넣는다.
+- 초기화가 끝난 뒤에는 최소 필수 구조가 모두 생성되었는지 한 번 더 검증한다.
 
 산출물:
 
