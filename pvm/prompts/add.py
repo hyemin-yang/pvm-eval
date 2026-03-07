@@ -16,7 +16,7 @@ from pvm.storage.time import utc_now_iso
 from pvm.storage.yaml_io import dump_yaml
 
 
-def add_prompt(root: Path, template_path: Path) -> dict[str, Any]:
+def add_prompt(root: Path, template_path: Path, bump_level: str = "patch") -> dict[str, Any]:
     """Store a prompt YAML template as a new immutable version artifact."""
     paths = ProjectPaths(root.resolve())
     template = load_prompt_template(template_path.resolve())
@@ -30,7 +30,7 @@ def add_prompt(root: Path, template_path: Path) -> dict[str, Any]:
     if not history_file.exists():
         write_text(history_file, "")
 
-    next_version = get_next_prompt_version(paths, prompt_id)
+    next_version = get_next_prompt_version(paths, prompt_id, bump_level=bump_level)
     checksum_payload = {
         "prompt": template["prompt"],
         "llm": template["llm"],

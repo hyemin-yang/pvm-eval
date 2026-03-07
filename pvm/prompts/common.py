@@ -7,12 +7,13 @@ from typing import Any
 from pvm.core.errors import InvalidPromptTemplateError, PromptNotFoundError, VersionNotFoundError
 from pvm.core.paths import ProjectPaths
 from pvm.storage.json_io import load_json
-from pvm.storage.semver import bump_patch
+from pvm.storage.semver import bump_major, bump_minor, bump_patch
 from pvm.storage.yaml_io import load_yaml
 
 
 ID_PATTERN = re.compile(r"^[^\s/]+$")
 INITIAL_VERSION = "0.1.0"
+BUMP_LEVELS = {"patch", "minor", "major"}
 
 
 def validate_prompt_id(prompt_id: str) -> None:
@@ -62,15 +63,24 @@ def list_prompt_versions(paths: ProjectPaths, prompt_id: str) -> list[str]:
     return sorted(versions, key=lambda value: tuple(int(part) for part in value.split(".")))
 
 
-def get_next_prompt_version(paths: ProjectPaths, prompt_id: str) -> str:
-    """Compute the next prompt version using patch-only increment rules."""
+def get_next_prompt_version(
+    paths: ProjectPaths, prompt_id: str, bump_level: str = "patch"
+) -> str:
+    """Compute the next prompt version using the requested semver bump level."""
+    if bump_level not in BUMP_LEVELS:
+        raise ValueError(f"Unsupported bump level: {bump_level}")
     prompt_dir = paths.prompt_dir(prompt_id)
     if not prompt_dir.exists():
         return INITIAL_VERSION
     versions = list_prompt_versions(paths, prompt_id)
     if not versions:
         return INITIAL_VERSION
-    return bump_patch(versions[-1])
+    latest = versions[-1]
+    if bump_level == "major":
+        return bump_major(latest)
+    if bump_level == "minor":
+        return bump_minor(latest)
+    return bump_patch(latest)
 
 
 def read_prompt_metadata(paths: ProjectPaths, prompt_id: str, version: str) -> dict[str, Any]:

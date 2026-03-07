@@ -19,23 +19,34 @@ def _render_project_tree(project: PVMProject) -> str:
     """Render the project summary as a labeled tree."""
     project_name = project.load_config()["name"]
     prompt_ids = project.list_prompt_ids()
-    if not prompt_ids:
+    snapshot_versions = project.list_snapshots()
+    if not prompt_ids and not snapshot_versions:
         return f"project: {project_name}"
 
     lines = [f"project: {project_name}"]
-    for prompt_index, prompt_id in enumerate(prompt_ids):
-        is_last_prompt = prompt_index == len(prompt_ids) - 1
-        prompt_prefix = "└── " if is_last_prompt else "├── "
-        lines.append(f"{prompt_prefix}id: {prompt_id}")
-        prompt_info = project.get_prompt_info(prompt_id)
-        production = prompt_info["production"]["version"] if prompt_info["production"] else None
-        versions = project.list_prompt_versions(prompt_id)
-        for version_index, version in enumerate(versions):
-            is_last_version = version_index == len(versions) - 1
-            version_prefix = "    " if is_last_prompt else "│   "
-            branch = "└── " if is_last_version else "├── "
-            suffix = " <--- production" if version == production else ""
-            lines.append(f"{version_prefix}{branch}version: {version}{suffix}")
+    items: list[tuple[str, str]] = [("prompt", prompt_id) for prompt_id in prompt_ids]
+    items.extend(("snapshot", version) for version in snapshot_versions)
+
+    for item_index, (item_type, value) in enumerate(items):
+        is_last_item = item_index == len(items) - 1
+        item_prefix = "└── " if is_last_item else "├── "
+
+        if item_type == "prompt":
+            prompt_id = value
+            lines.append(f"{item_prefix}id: {prompt_id}")
+            prompt_info = project.get_prompt_info(prompt_id)
+            production = prompt_info["production"]["version"] if prompt_info["production"] else None
+            versions = project.list_prompt_versions(prompt_id)
+            for version_index, version in enumerate(versions):
+                is_last_version = version_index == len(versions) - 1
+                version_prefix = "    " if is_last_item else "│   "
+                branch = "└── " if is_last_version else "├── "
+                suffix = " <--- production" if version == production else ""
+                lines.append(f"{version_prefix}{branch}version: {version}{suffix}")
+            continue
+
+        snapshot_version = value
+        lines.append(f"{item_prefix}snapshot: {snapshot_version}")
 
     return "\n".join(lines)
 
@@ -57,9 +68,23 @@ def init(name: str = typer.Argument("my-project")) -> None:
 
 
 @app.command("add")
-def add(template: Path) -> None:
+def add(
+    template: Path,
+    minor: bool = typer.Option(False, "--minor", help="Bump the minor version"),
+    major: bool = typer.Option(False, "--major", help="Bump the major version"),
+) -> None:
     """Add a prompt template as a new immutable version."""
-    result = _project().add_prompt(template)
+    if minor and major:
+        typer.secho("Options --minor and --major are mutually exclusive", fg=typer.colors.RED, err=True)
+        raise SystemExit(1)
+
+    bump_level = "patch"
+    if major:
+        bump_level = "major"
+    elif minor:
+        bump_level = "minor"
+
+    result = _project().add_prompt(template, bump_level=bump_level)
     if not result["changed"]:
         print("No changes")
         return
@@ -173,9 +198,22 @@ def template() -> None:
 
 
 @snapshot_app.command("create")
-def snapshot_create() -> None:
+def snapshot_create(
+    minor: bool = typer.Option(False, "--minor", help="Bump the minor snapshot version"),
+    major: bool = typer.Option(False, "--major", help="Bump the major snapshot version"),
+) -> None:
     """Create a production snapshot."""
-    _print_json(_project().create_snapshot())
+    if minor and major:
+        typer.secho("Options --minor and --major are mutually exclusive", fg=typer.colors.RED, err=True)
+        raise SystemExit(1)
+
+    bump_level = "patch"
+    if major:
+        bump_level = "major"
+    elif minor:
+        bump_level = "minor"
+
+    _print_json(_project().create_snapshot(bump_level=bump_level))
 
 
 @snapshot_app.command("list")

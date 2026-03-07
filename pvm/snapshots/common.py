@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pvm.core.errors import VersionNotFoundError
 from pvm.core.paths import ProjectPaths
-from pvm.storage.semver import bump_patch
+from pvm.storage.semver import bump_major, bump_minor, bump_patch
 
 
 INITIAL_VERSION = "0.1.0"
@@ -22,12 +22,17 @@ def list_snapshot_versions(paths: ProjectPaths) -> list[str]:
     return sorted(versions, key=lambda value: tuple(int(part) for part in value.split(".")))
 
 
-def get_next_snapshot_version(paths: ProjectPaths) -> str:
-    """Compute the next snapshot version using patch-only increment rules."""
+def get_next_snapshot_version(paths: ProjectPaths, bump_level: str = "patch") -> str:
+    """Compute the next snapshot version using the requested semver bump level."""
     versions = list_snapshot_versions(paths)
     if not versions:
         return INITIAL_VERSION
-    return bump_patch(versions[-1])
+    latest = versions[-1]
+    if bump_level == "major":
+        return bump_major(latest)
+    if bump_level == "minor":
+        return bump_minor(latest)
+    return bump_patch(latest)
 
 
 def ensure_snapshot_exists(paths: ProjectPaths, version: str) -> None:

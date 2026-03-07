@@ -103,6 +103,40 @@ def test_add_patch_increment(tmp_path: Path) -> None:
     assert result["version"] == "0.1.1"
 
 
+def test_add_minor_increment(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+
+    _write_template(template, prompt="classify the user intent carefully", temperature=0.3)
+    result = project.add_prompt(template, bump_level="minor")
+
+    assert result["version"] == "0.2.0"
+
+
+def test_add_major_increment(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+
+    _write_template(template, prompt="classify the user intent carefully", temperature=0.3)
+    result = project.add_prompt(template, bump_level="major")
+
+    assert result["version"] == "1.0.0"
+
+
+def test_first_version_ignores_bump_flags(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+
+    result = project.add_prompt(template, bump_level="major")
+
+    assert result["version"] == "0.1.0"
+
+
 def test_add_noop_on_identical_content(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     template = tmp_path / "prompt.yaml"
@@ -239,6 +273,32 @@ def test_snapshot_create_get_read_and_diff(tmp_path: Path) -> None:
     ]
 
 
+def test_snapshot_minor_increment(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+    project.deploy("intent_classifier", "0.1.0")
+
+    first = project.create_snapshot()
+    second = project.create_snapshot(bump_level="minor")
+
+    assert first["version"] == "0.1.0"
+    assert second["version"] == "0.2.0"
+
+
+def test_first_snapshot_ignores_bump_flags(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+    project.deploy("intent_classifier", "0.1.0")
+
+    snapshot = project.create_snapshot(bump_level="major")
+
+    assert snapshot["version"] == "0.1.0"
+
+
 def test_cli_init_and_list(tmp_path: Path) -> None:
     env = dict(os.environ)
     env["PYTHONPATH"] = str(Path.cwd())
@@ -304,6 +364,71 @@ def test_cli_template(tmp_path: Path) -> None:
 
     assert "id: intent_classifier" in result.stdout
     assert "llm:" in result.stdout
+
+
+def test_cli_add_minor(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    _write_template(template, prompt="classify carefully", temperature=0.3)
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template), "--minor"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout)["version"] == "0.2.0"
+
+
+def test_cli_add_rejects_minor_and_major_together(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template), "--minor", "--major"],
+        cwd=tmp_path,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "mutually exclusive" in result.stderr
 
 
 def test_cli_deploy_without_version_uses_latest(tmp_path: Path) -> None:
@@ -461,6 +586,84 @@ def test_cli_get_uses_latest_when_production_is_missing(tmp_path: Path) -> None:
     assert json.loads(result.stdout)["version"] == "0.1.1"
 
 
+def test_cli_snapshot_create_minor(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "deploy", "intent_classifier", "0.1.0"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "snapshot", "create"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "snapshot", "create", "--minor"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout)["version"] == "0.2.0"
+
+
+def test_cli_snapshot_create_rejects_minor_and_major_together(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "snapshot", "create", "--minor", "--major"],
+        cwd=tmp_path,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "mutually exclusive" in result.stderr
+
+
 def test_cli_get_missing_explicit_version_returns_error_without_traceback(tmp_path: Path) -> None:
     env = dict(os.environ)
     env["PYTHONPATH"] = str(Path.cwd())
@@ -541,6 +744,14 @@ def test_cli_project_shows_project_summary(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     )
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "snapshot", "create"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
 
     result = subprocess.run(
         [sys.executable, "-m", "pvm.cli", "project"],
@@ -553,6 +764,7 @@ def test_cli_project_shows_project_summary(tmp_path: Path) -> None:
 
     output = result.stdout.strip()
     assert "project: demo-project" in output
-    assert "└── id: intent_classifier" in output
+    assert "├── id: intent_classifier" in output
     assert "├── version: 0.1.0" in output
-    assert "└── version: 0.1.1 <--- production" in output
+    assert "│   └── version: 0.1.1 <--- production" in output
+    assert "└── snapshot: 0.1.0" in output
