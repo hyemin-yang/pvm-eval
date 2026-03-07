@@ -235,3 +235,21 @@ def test_cli_template(tmp_path: Path) -> None:
 
     assert "id: intent_classifier" in result.stdout
     assert "llm:" in result.stdout
+
+
+def test_cli_hides_traceback_for_domain_errors(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "list"],
+        cwd=tmp_path,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert "not a valid pvm project" in result.stderr

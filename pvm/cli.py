@@ -7,6 +7,7 @@ from typing import Any
 import typer
 import yaml
 
+from pvm.core.errors import PVMError
 from pvm.project import PVMProject
 
 
@@ -174,7 +175,11 @@ def snapshot_diff(from_version: str, to_version: str) -> None:
 
 def main() -> None:
     """Execute the pvm CLI."""
-    app()
+    try:
+        app()
+    except PVMError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
