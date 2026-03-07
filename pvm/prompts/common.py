@@ -4,10 +4,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-from pvm.core.errors import InvalidPromptTemplateError, PromptNotFoundError, VersionNotFoundError
+from pvm.core.errors import (
+    InvalidPromptTemplateError,
+    PromptNotFoundError,
+    VersionNotFoundError,
+)
 from pvm.core.paths import ProjectPaths
 from pvm.storage.json_io import load_json
-from pvm.storage.semver import bump_major, bump_minor, bump_patch
+from pvm.storage.semver import bump_major, bump_minor, bump_patch, parse_semver, semver_sort_key
 from pvm.storage.yaml_io import load_yaml
 
 
@@ -48,6 +52,7 @@ def ensure_prompt_exists(paths: ProjectPaths, prompt_id: str) -> None:
 
 def ensure_prompt_version_exists(paths: ProjectPaths, prompt_id: str, version: str) -> None:
     """Raise if the given prompt version does not exist."""
+    parse_semver(version)
     version_dir = paths.prompt_version_dir(prompt_id, version)
     if not version_dir.exists():
         raise VersionNotFoundError(f"Prompt version not found: {prompt_id}@{version}")
@@ -60,11 +65,14 @@ def list_prompt_versions(paths: ProjectPaths, prompt_id: str) -> list[str]:
     if not versions_dir.exists():
         return []
     versions = [path.name for path in versions_dir.iterdir() if path.is_dir()]
-    return sorted(versions, key=lambda value: tuple(int(part) for part in value.split(".")))
+    return sorted(versions, key=semver_sort_key)
 
 
 def get_next_prompt_version(
-    paths: ProjectPaths, prompt_id: str, bump_level: str = "patch"
+    paths: ProjectPaths,
+    prompt_id: str,
+    bump_level: str = "patch",
+    versions: list[str] | None = None,
 ) -> str:
     """Compute the next prompt version using the requested semver bump level."""
     if bump_level not in BUMP_LEVELS:
@@ -72,10 +80,12 @@ def get_next_prompt_version(
     prompt_dir = paths.prompt_dir(prompt_id)
     if not prompt_dir.exists():
         return INITIAL_VERSION
-    versions = list_prompt_versions(paths, prompt_id)
-    if not versions:
+    known_versions = list_prompt_versions(paths, prompt_id) if versions is None else sorted(
+        versions, key=semver_sort_key
+    )
+    if not known_versions:
         return INITIAL_VERSION
-    latest = versions[-1]
+    latest = known_versions[-1]
     if bump_level == "major":
         return bump_major(latest)
     if bump_level == "minor":

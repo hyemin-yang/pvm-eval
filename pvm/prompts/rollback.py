@@ -1,12 +1,10 @@
 from __future__ import annotations
-
-import json
 from pathlib import Path
 from typing import Any
 
 from pvm.core.paths import ProjectPaths
 from pvm.prompts.common import ensure_prompt_exists
-from pvm.storage.history import append_history
+from pvm.storage.history import append_history, read_history
 from pvm.storage.json_io import dump_json, load_json
 from pvm.storage.time import utc_now_iso
 
@@ -27,14 +25,8 @@ def rollback_prompt(root: Path, prompt_id: str) -> dict[str, Any]:
     current = load_json(production_file)
     current_version = current["version"]
 
-    history_entries: list[dict[str, Any]] = []
     history_file = paths.prompt_history_file(prompt_id)
-    if history_file.exists():
-        with history_file.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if line:
-                    history_entries.append(json.loads(line))
+    history_entries = read_history(history_file)
 
     candidate_version = None
     for entry in reversed(history_entries):

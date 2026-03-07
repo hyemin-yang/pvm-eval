@@ -5,6 +5,7 @@ from typing import Any
 
 from pvm.core.paths import ProjectPaths
 from pvm.prompts.common import ensure_prompt_exists, list_prompt_versions
+from pvm.storage.semver import parse_semver
 from pvm.storage.history import append_history
 from pvm.storage.json_io import dump_json, load_json
 from pvm.storage.time import utc_now_iso
@@ -26,6 +27,8 @@ def deploy_prompt(root: Path, prompt_id: str, version: str | None = None) -> dic
                 "reason": "version_not_found",
             }
         target_version = versions[-1]
+    else:
+        parse_semver(target_version)
 
     version_dir = paths.prompt_version_dir(prompt_id, target_version)
     if not version_dir.exists():
