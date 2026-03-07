@@ -284,19 +284,19 @@ TODO:
 
 TODO:
 
-- [ ] init 테스트
-- [ ] invalid project 테스트
-- [ ] add 첫 버전 생성 테스트
-- [ ] add patch 증가 테스트
-- [ ] add 동일 내용 no-op 테스트
-- [ ] deploy 테스트
-- [ ] rollback 테스트
-- [ ] prompt diff 테스트
-- [ ] snapshot create 테스트
-- [ ] snapshot get 테스트
-- [ ] snapshot read 테스트
-- [ ] snapshot diff 테스트
-- [ ] 생성된 파일 내용 검증 추가
+- [x] init 테스트
+- [x] invalid project 테스트
+- [x] add 첫 버전 생성 테스트
+- [x] add patch 증가 테스트
+- [x] add 동일 내용 no-op 테스트
+- [x] deploy 테스트
+- [x] rollback 테스트
+- [x] prompt diff 테스트
+- [x] snapshot create 테스트
+- [x] snapshot get 테스트
+- [x] snapshot read 테스트
+- [x] snapshot diff 테스트
+- [x] 생성된 파일 내용 검증 추가
 
 완료 조건:
 
@@ -317,23 +317,23 @@ TODO:
 
 TODO:
 
-- [ ] `pvm init`
-- [ ] `pvm add`
-- [ ] `pvm deploy`
-- [ ] `pvm rollback`
-- [ ] `pvm get`
-- [ ] `pvm diff`
-- [ ] `pvm snapshot create`
-- [ ] `pvm snapshot list`
-- [ ] `pvm snapshot get`
-- [ ] `pvm snapshot read`
-- [ ] `pvm snapshot diff`
-- [ ] `pvm list`
-- [ ] `pvm id`
-- [ ] `pvm log`
-- [ ] `pvm tree`
-- [ ] no-op 메시지 처리
-- [ ] 사람이 읽기 쉬운 출력 포맷 정리
+- [x] `pvm init`
+- [x] `pvm add`
+- [x] `pvm deploy`
+- [x] `pvm rollback`
+- [x] `pvm get`
+- [x] `pvm diff`
+- [x] `pvm snapshot create`
+- [x] `pvm snapshot list`
+- [x] `pvm snapshot get`
+- [x] `pvm snapshot read`
+- [x] `pvm snapshot diff`
+- [x] `pvm list`
+- [x] `pvm id`
+- [x] `pvm log`
+- [x] `pvm tree`
+- [x] no-op 메시지 처리
+- [x] 사람이 읽기 쉬운 출력 포맷 정리
 
 완료 조건:
 
