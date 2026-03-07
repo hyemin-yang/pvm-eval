@@ -8,6 +8,12 @@ from pvm.config.load_config import load_config
 from pvm.config.load_template import load_template
 from pvm.core.errors import NotValidProjectError
 from pvm.core.paths import ProjectPaths
+from pvm.prompts.add import add_prompt
+from pvm.prompts.deploy import deploy_prompt
+from pvm.prompts.get import get_prompt
+from pvm.prompts.get_info import get_prompt_info
+from pvm.prompts.list_ids import list_prompt_ids, list_prompt_versions_for_id
+from pvm.prompts.rollback import rollback_prompt
 
 
 class PVMProject:
@@ -61,3 +67,38 @@ class PVMProject:
         """Load the default prompt template stored in project settings."""
         self.require_valid()
         return load_template(self.root)
+
+    def add_prompt(self, template_path: str | Path) -> dict[str, Any]:
+        """Create a new prompt version from a YAML template file."""
+        self.require_valid()
+        return add_prompt(self.root, Path(template_path))
+
+    def list_prompt_ids(self) -> list[str]:
+        """List all prompt ids in the current project."""
+        self.require_valid()
+        return list_prompt_ids(self.root)
+
+    def list_prompt_versions(self, prompt_id: str) -> list[str]:
+        """List all versions for a single prompt id."""
+        self.require_valid()
+        return list_prompt_versions_for_id(self.root, prompt_id)
+
+    def get_prompt(self, prompt_id: str, version: str | None = None) -> dict[str, Any]:
+        """Read a prompt by explicit version or current production version."""
+        self.require_valid()
+        return get_prompt(self.root, prompt_id, version=version)
+
+    def get_prompt_info(self, prompt_id: str) -> dict[str, Any]:
+        """Read stable prompt metadata and version summary."""
+        self.require_valid()
+        return get_prompt_info(self.root, prompt_id)
+
+    def deploy(self, prompt_id: str, version: str) -> dict[str, Any]:
+        """Promote a prompt version to production."""
+        self.require_valid()
+        return deploy_prompt(self.root, prompt_id, version)
+
+    def rollback(self, prompt_id: str) -> dict[str, Any]:
+        """Rollback a prompt to the previous production version."""
+        self.require_valid()
+        return rollback_prompt(self.root, prompt_id)

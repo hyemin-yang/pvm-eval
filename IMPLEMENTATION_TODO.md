@@ -119,22 +119,22 @@ TODO:
 
 TODO:
 
-- [ ] 템플릿 YAML 로드
-- [ ] 필수 필드 `id`, `llm`, `prompt` 검증
-- [ ] `id` 유효성 검사
-- [ ] prompt 디렉토리 없으면 초기 구조 생성
-- [ ] 최신 버전 조회
-- [ ] 다음 patch 버전 계산
-- [ ] 최신 버전과 checksum 비교
-- [ ] 동일 내용이면 `changed=False` 결과 반환
-- [ ] 새 버전 디렉토리 생성
-- [ ] `prompt.md` 저장
-- [ ] `model_config.json` 저장
-- [ ] `metadata.json` 저장
-- [ ] `template.yaml` 저장
-- [ ] `info.yaml` 초기 생성 또는 안정 메타 갱신 규칙 반영
-- [ ] `history.jsonl`에 `add` 이벤트 append
-- [ ] `PVMProject.add_prompt(path)` 연결
+- [x] 템플릿 YAML 로드
+- [x] 필수 필드 `id`, `llm`, `prompt` 검증
+- [x] `id` 유효성 검사
+- [x] prompt 디렉토리 없으면 초기 구조 생성
+- [x] 최신 버전 조회
+- [x] 다음 patch 버전 계산
+- [x] 최신 버전과 checksum 비교
+- [x] 동일 내용이면 `changed=False` 결과 반환
+- [x] 새 버전 디렉토리 생성
+- [x] `prompt.md` 저장
+- [x] `model_config.json` 저장
+- [x] `metadata.json` 저장
+- [x] `template.yaml` 저장
+- [x] `info.yaml` 초기 생성 또는 안정 메타 갱신 규칙 반영
+- [x] `history.jsonl`에 `add` 이벤트 append
+- [x] `PVMProject.add_prompt(path)` 연결
 
 완료 조건:
 
@@ -157,13 +157,13 @@ TODO:
 
 TODO:
 
-- [ ] prompt id 목록 조회 구현
-- [ ] prompt 버전 목록 조회 구현
-- [ ] `info.yaml`, `production.json`, 최신 버전 조합 조회 구현
-- [ ] 특정 버전 prompt 읽기 구현
-- [ ] production 버전 prompt 읽기 구현
-- [ ] 반환 dict 스키마 통일
-- [ ] `PVMProject` 메서드 연결
+- [x] prompt id 목록 조회 구현
+- [x] prompt 버전 목록 조회 구현
+- [x] `info.yaml`, `production.json`, 최신 버전 조합 조회 구현
+- [x] 특정 버전 prompt 읽기 구현
+- [x] production 버전 prompt 읽기 구현
+- [x] 반환 dict 스키마 통일
+- [x] `PVMProject` 메서드 연결
 
 완료 조건:
 
@@ -185,16 +185,16 @@ TODO:
 
 TODO:
 
-- [ ] 대상 버전 존재 확인 로직 구현
-- [ ] `deploy` no-op 정책 구현
-- [ ] `production.json` 갱신 구현
-- [ ] `deploy` history 이벤트 append 구현
-- [ ] 현재 production 읽기 구현
-- [ ] history 기반 rollback 후보 탐색 구현
-- [ ] rollback no-op 정책 구현
-- [ ] `rollback` history 이벤트 append 구현
-- [ ] `PVMProject.deploy(id, version)` 연결
-- [ ] `PVMProject.rollback(id)` 연결
+- [x] 대상 버전 존재 확인 로직 구현
+- [x] `deploy` no-op 정책 구현
+- [x] `production.json` 갱신 구현
+- [x] `deploy` history 이벤트 append 구현
+- [x] 현재 production 읽기 구현
+- [x] history 기반 rollback 후보 탐색 구현
+- [x] rollback no-op 정책 구현
+- [x] `rollback` history 이벤트 append 구현
+- [x] `PVMProject.deploy(id, version)` 연결
+- [x] `PVMProject.rollback(id)` 연결
 
 완료 조건:
 

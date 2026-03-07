@@ -30,6 +30,27 @@ class ProjectPaths:
     def prompts_dir(self) -> Path:
         return self.project_dir / "prompts"
 
+    def prompt_dir(self, prompt_id: str) -> Path:
+        return self.prompts_dir / prompt_id
+
+    def prompt_info_file(self, prompt_id: str) -> Path:
+        return self.prompt_dir(prompt_id) / "info.yaml"
+
+    def prompt_production_file(self, prompt_id: str) -> Path:
+        return self.prompt_dir(prompt_id) / "production.json"
+
+    def prompt_history_file(self, prompt_id: str) -> Path:
+        return self.prompt_dir(prompt_id) / "history.jsonl"
+
+    def prompt_versions_dir(self, prompt_id: str) -> Path:
+        return self.prompt_dir(prompt_id) / "versions"
+
+    def prompt_version_dir(self, prompt_id: str, version: str) -> Path:
+        return self.prompt_versions_dir(prompt_id) / version
+
+    def prompt_version_file(self, prompt_id: str, version: str, filename: str) -> Path:
+        return self.prompt_version_dir(prompt_id, version) / filename
+
     @property
     def snapshots_dir(self) -> Path:
         return self.project_dir / "snapshots"
