@@ -42,11 +42,17 @@ def add(template: Path) -> None:
 
 
 @app.command("deploy")
-def deploy(prompt_id: str = typer.Argument(..., metavar="ID"), version: str = typer.Argument(...)) -> None:
-    """Deploy a prompt version to production."""
+def deploy(
+    prompt_id: str = typer.Argument(..., metavar="ID"),
+    version: str | None = typer.Argument(None),
+) -> None:
+    """Deploy a prompt version to production, defaulting to the latest version."""
     result = _project().deploy(prompt_id, version)
     if not result["changed"]:
-        print("없는 버전")
+        if result.get("reason") == "already_deployed":
+            print("이미 production 버전")
+        else:
+            print("없는 버전")
         return
     _print_json(result)
 

@@ -99,8 +99,8 @@ class PVMProject:
         self.require_valid()
         return get_prompt_info(self.root, prompt_id)
 
-    def deploy(self, prompt_id: str, version: str) -> dict[str, Any]:
-        """Promote a prompt version to production."""
+    def deploy(self, prompt_id: str, version: str | None = None) -> dict[str, Any]:
+        """Promote a prompt version to production, defaulting to the latest version."""
         self.require_valid()
         return deploy_prompt(self.root, prompt_id, version)
 

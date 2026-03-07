@@ -119,6 +119,36 @@ def test_deploy_and_get_production(tmp_path: Path) -> None:
     assert prompt["version"] == "0.1.0"
 
 
+def test_deploy_without_version_uses_latest(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+
+    _write_template(template, prompt="classify carefully", temperature=0.3)
+    project.add_prompt(template)
+
+    deploy_result = project.deploy("intent_classifier")
+
+    assert deploy_result["changed"] is True
+    assert deploy_result["version"] == "0.1.1"
+    assert project.get_prompt("intent_classifier")["version"] == "0.1.1"
+
+
+def test_deploy_same_version_is_noop(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+
+    first = project.deploy("intent_classifier", "0.1.0")
+    second = project.deploy("intent_classifier", "0.1.0")
+
+    assert first["changed"] is True
+    assert second["changed"] is False
+    assert second["reason"] == "already_deployed"
+
+
 def test_rollback_to_previous_version(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     template = tmp_path / "prompt.yaml"
@@ -235,6 +265,97 @@ def test_cli_template(tmp_path: Path) -> None:
 
     assert "id: intent_classifier" in result.stdout
     assert "llm:" in result.stdout
+
+
+def test_cli_deploy_without_version_uses_latest(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    _write_template(template, prompt="classify carefully", temperature=0.3)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "deploy", "intent_classifier"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout)["version"] == "0.1.1"
+
+
+def test_cli_deploy_same_version_is_noop(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "deploy", "intent_classifier", "0.1.0"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "deploy", "intent_classifier", "0.1.0"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "이미 production 버전"
 
 
 def test_cli_hides_traceback_for_domain_errors(tmp_path: Path) -> None:
