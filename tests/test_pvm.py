@@ -474,3 +474,42 @@ def test_cli_tree_shows_prompt_ids_and_versions(tmp_path: Path) -> None:
     assert "intent_classifier" in output
     assert "0.1.0" in output
     assert "0.1.1" in output
+
+
+def test_cli_project_shows_project_summary(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout.strip()
+    assert "demo-project" in output
+    assert "intent_classifier" in output
+    assert "0.1.0" in output
