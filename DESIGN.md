@@ -36,7 +36,8 @@
 ### Prompt Version
 
 - 각 `id`는 독립적으로 semver(`MAJOR.MINOR.PATCH`) 버전을 가진다.
-- MVP에서 `add`는 patch만 자동 증가시킨다.
+- `add`는 기본적으로 patch를 증가시킨다.
+- `add --minor`, `add --major`로 minor/major 증가를 지원한다.
 - 최초 버전은 `0.1.0`이다.
 
 ### Production
@@ -49,6 +50,8 @@
 - snapshot은 현재 시점의 전체 production 조합을 묶어 저장한 버전이다.
 - 즉, `id -> production version` 집합의 스냅샷이다.
 - snapshot도 semver를 사용한다.
+- `snapshot create`는 기본적으로 patch를 증가시킨다.
+- `snapshot create --minor`, `snapshot create --major`를 지원한다.
 - snapshot 최초 버전은 `0.1.0`이다.
 
 ---
@@ -238,7 +241,7 @@ snapshot 생성 이력 저장.
 
 최신 버전과 체크섬이 같으면:
 
-- `변경 없음` 출력
+- `No changes` 출력
 - 새 버전 생성하지 않음
 
 ---
@@ -356,9 +359,9 @@ history는 삭제하지 않는다. append-only 로그로 유지한다.
 4. YAML 내부 `id` 추출
 5. 해당 `id` 디렉토리 생성 또는 로드
 6. 최신 버전 조회
-7. patch 증가
+7. bump level에 따라 patch/minor/major 증가
 8. 내용 중복 체크
-9. 변경 없으면 `변경 없음` 출력 후 종료
+9. 변경 없으면 `No changes` 출력 후 종료
 10. 변경 있으면 새 버전 생성
 11. history에 `add` 이벤트 기록
 
@@ -367,16 +370,22 @@ history는 삭제하지 않는다. append-only 로그로 유지한다.
 입력:
 
 - `id`
-- `version`
+- 선택: `version`
 
 동작:
 
-1. 해당 버전 존재 확인
-2. 현재 production 읽기
-3. `production.json` 갱신
-4. history에 `deploy` 이벤트 기록
+1. `version`이 없으면 최신 버전 결정
+2. 해당 버전 존재 확인
+3. 현재 production 읽기
+4. 현재 production과 동일 버전이면 no-op
+5. `production.json` 갱신
+6. history에 `deploy` 이벤트 기록
 
 존재하지 않는 버전이면:
+
+- 아무 일도 하지 않음
+
+현재 production과 동일한 버전이면:
 
 - 아무 일도 하지 않음
 
@@ -408,8 +417,9 @@ history는 삭제하지 않는다. append-only 로그로 유지한다.
 
 동작:
 
-- `version`이 없으면 현재 production 프롬프트 반환
 - `version`이 있으면 해당 버전 프롬프트 반환
+- `version`이 없고 production이 있으면 production 프롬프트 반환
+- `version`이 없고 production이 없으면 최신 버전 프롬프트 반환
 
 ### `diff`
 
@@ -438,7 +448,7 @@ history는 삭제하지 않는다. append-only 로그로 유지한다.
 동작:
 
 1. 현재 모든 `id`의 production 상태 수집
-2. snapshot semver 증가
+2. bump level에 따라 patch/minor/major 증가
 3. snapshot 파일 생성
 4. snapshot history 기록
 
@@ -492,7 +502,7 @@ history는 삭제하지 않는다. append-only 로그로 유지한다.
 추천 패키지 구조:
 
 ```text
-src/pvm/
+pvm/
   __init__.py
   project.py
 
@@ -541,11 +551,12 @@ from pvm.project import PVMProject
 
 project = PVMProject.cwd()
 project.init(name="my-project")
-project.add_prompt("prompt.yaml")
-project.deploy("intent_classifier", "0.1.1")
+project.add_prompt("prompt.yaml", bump_level="patch")
+project.deploy("intent_classifier")
 project.rollback("intent_classifier")
+project.get_prompt("intent_classifier")
 project.diff_prompt("intent_classifier", "0.1.0", "0.1.1")
-project.create_snapshot()
+project.create_snapshot(bump_level="patch")
 project.diff_snapshot("0.1.0", "0.1.1")
 snapshot = project.read_snapshot("0.1.0")
 ```
@@ -578,27 +589,31 @@ snapshot = project.read_snapshot("0.1.0")
 
 ---
 
-## 향후 CLI 명령 매핑
+## CLI 명령 매핑
 
-라이브러리 구현 후 CLI는 아래 명령으로 포장한다.
+현재 CLI는 아래 명령으로 제공한다.
 
 - `pvm init`
 - `pvm list`
-- `pvm name`
-- `pvm env`
-- `pvm tree`
+- `pvm project`
 - `pvm log`
 - `pvm log --id <id>`
 - `pvm id <id>`
 - `pvm id <id> --info`
 - `pvm id <id> --list`
+- `pvm template`
 - `pvm add <file.yaml>`
+- `pvm add <file.yaml> --minor`
+- `pvm add <file.yaml> --major`
+- `pvm deploy <id>`
 - `pvm deploy <id> <version>`
 - `pvm rollback <id>`
 - `pvm get <id>`
 - `pvm get <id> --version <version>`
 - `pvm diff <id> <from_version> <to_version>`
 - `pvm snapshot create`
+- `pvm snapshot create --minor`
+- `pvm snapshot create --major`
 - `pvm snapshot list`
 - `pvm snapshot get <version>`
 - `pvm snapshot read <version>`
@@ -612,7 +627,7 @@ snapshot = project.read_snapshot("0.1.0")
 
 - 프로젝트 초기화
 - YAML 기반 프롬프트 추가
-- semver patch 자동 증가
+- semver patch/minor/major 증가
 - 동일 내용 중복 추가 방지
 - id별 production 관리
 - id별 rollback
@@ -639,14 +654,14 @@ MVP 구현은 아래 순서로 진행한다.
 
 ### 1. 패키지 골격 구성
 
-- `src/pvm/` 패키지 생성
+- `pvm/` 패키지 생성
 - `PVMProject` 퍼사드 추가
 - `core`, `config`, `prompts`, `snapshots`, `storage` 폴더 구성
 - 공통 예외 타입 정의
 
 구현 방법:
 
-- `src/pvm/project.py`에 `PVMProject` 클래스를 만든다.
+- `pvm/project.py`에 `PVMProject` 클래스를 만든다.
 - `PVMProject`는 외부 진입점만 제공하고 내부 구현은 기능 모듈 함수에 위임한다.
 - `core/errors.py`에는 `NotValidProjectError`, `AlreadyInitializedError`, `PromptNotFoundError`, `VersionNotFoundError` 같은 예외를 둔다.
 - `core/paths.py`에는 `.pvm/`, `prompts/`, `snapshots/` 경로를 계산하는 헬퍼를 둔다.
@@ -699,7 +714,7 @@ MVP 구현은 아래 순서로 진행한다.
 - `storage/json_io.py`에는 JSON load/save 함수, `storage/yaml_io.py`에는 YAML load/save 함수를 둔다.
 - 텍스트 저장은 UTF-8 고정으로 처리한다.
 - checksum은 `sha256`으로 계산하되, dict는 key 정렬 후 JSON 문자열로 정규화해 해시한다.
-- semver 증가는 우선 patch 증가만 구현한다.
+- semver 증가는 기본 patch, 선택적 minor/major 증가를 구현한다.
   - 예: `0.1.0 -> 0.1.1`
 - history append는 `json.dumps(record, ensure_ascii=False)` 결과를 한 줄씩 append하는 방식으로 구현한다.
 - timestamp는 UTC ISO 8601 문자열로 통일한다.
@@ -713,9 +728,9 @@ MVP 구현은 아래 순서로 진행한다.
 - YAML 템플릿 검증
 - `id`, `llm`, `prompt`, `description` 추출
 - id별 최신 버전 조회
-- patch 증가
+- bump level별 patch/minor/major 증가
 - 최신 버전과 checksum 비교
-- 동일 내용이면 `변경 없음` 처리
+- 동일 내용이면 `No changes` 처리
 - 새 버전 디렉토리 생성
   - `prompt.md`
   - `model_config.json`
@@ -725,7 +740,7 @@ MVP 구현은 아래 순서로 진행한다.
 
 구현 방법:
 
-- `prompts/add.py`에 `add_prompt(root: Path, template_path: Path)` 유스케이스 함수를 만든다.
+- `prompts/add.py`에 `add_prompt(root: Path, template_path: Path, bump_level: str = "patch")` 유스케이스 함수를 만든다.
 - YAML 로드 후 필수 필드인 `id`, `llm`, `prompt` 존재 여부를 검사한다.
 - `author`가 있으면 `info.yaml`, `metadata.json`에 함께 저장한다.
 - `id` 디렉토리가 없으면 `info.yaml`, `versions/`, `history.jsonl`를 생성한다.
@@ -735,7 +750,7 @@ MVP 구현은 아래 순서로 진행한다.
   - `llm`
   - `description`
   - `author`
-- 최신 버전의 checksum과 같으면 결과 객체를 `changed=False`로 반환하고 상위 레이어가 `변경 없음`을 출력하게 한다.
+- 최신 버전의 checksum과 같으면 결과 객체를 `changed=False`로 반환하고 상위 레이어가 `No changes`를 출력하게 한다.
 - 새 버전 생성 시:
   - `prompt`는 `prompt.md`
   - `llm`은 `model_config.json`
@@ -774,10 +789,10 @@ MVP 구현은 아래 순서로 진행한다.
 
 ### 6. Production 관리 구현
 
-- `deploy(id, version)`
+- `deploy(id, version=None)`
 - `production.json` 갱신
 - `deploy` history 기록
-- 없는 버전이면 no-op
+- 없는 버전이면 no-op 후 CLI는 `Version not found`를 출력한다.
 
 - `rollback(id)`
 - 이전 deploy/rollback 이력 기반 이전 production 계산
@@ -805,7 +820,7 @@ MVP 구현은 아래 순서로 진행한다.
 
 산출물:
 
-- `PVMProject.deploy(id, version)`
+- `PVMProject.deploy(id, version=None)`
 - `PVMProject.rollback(id)`
 
 ### 7. Diff 기능 구현
@@ -847,7 +862,7 @@ MVP 구현은 아래 순서로 진행한다.
 - `snapshots/create.py`는 모든 prompt id를 순회하면서 `production.json`을 읽는다.
 - production이 없는 id는 snapshot에서 제외한다.
 - 각 production 버전에 대한 `metadata.json`을 함께 읽어 checksum을 manifest에 넣는다.
-- snapshot 최신 버전을 기준으로 patch 증가시켜 새 파일을 만든다.
+- snapshot 최신 버전을 기준으로 bump level별 patch/minor/major 증가시켜 새 파일을 만든다.
 - 결과는 `.pvm/snapshots/versions/{version}.json`에 저장한다.
 - 생성 후 `.pvm/snapshots/history.jsonl`에 `create` 이벤트를 append한다.
 
@@ -862,7 +877,7 @@ MVP 구현은 아래 순서로 진행한다.
 
 산출물:
 
-- `PVMProject.create_snapshot()`
+- `PVMProject.create_snapshot(bump_level="patch")`
 - `PVMProject.list_snapshots()`
 - `PVMProject.get_snapshot(version)`
 - `PVMProject.read_snapshot(version)`
@@ -872,7 +887,7 @@ MVP 구현은 아래 순서로 진행한다.
 - init 테스트
 - add 테스트
   - 첫 버전 생성
-  - patch 증가
+  - bump level 지원
   - 동일 내용 no-op
 - deploy 테스트
 - rollback 테스트
@@ -907,7 +922,7 @@ MVP 구현은 아래 순서로 진행한다.
 - `pvm diff`
 - `pvm snapshot create|get|list|read`
 - `pvm snapshot diff`
-- `pvm list`, `pvm id`, `pvm log`, `pvm tree`
+- `pvm list`, `pvm id`, `pvm log`, `pvm project`, `pvm template`
 
 원칙:
 
@@ -919,7 +934,7 @@ MVP 구현은 아래 순서로 진행한다.
 - CLI 엔트리포인트는 별도 모듈에 두고 인자 파싱만 담당하게 한다.
 - 각 서브커맨드는 `PVMProject` 메서드 호출 후 결과를 사람이 읽기 쉬운 형태로 출력한다.
 - no-op 상황은 예외 대신 메시지로 처리한다.
-  - 예: `변경 없음`, `없는 버전`, `되돌릴 기록 없음`
+  - 예: `No changes`, `Version not found`, `No rollback target`
 - 라이브러리와 CLI의 책임을 분리하기 위해 출력 문자열 생성은 CLI 레이어에서만 수행한다.
 
 ---
