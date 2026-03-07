@@ -26,8 +26,10 @@ DEFAULT_TEMPLATE = {
     "input_variables": ["user_input", "history"],
 }
 
+DEFAULT_PROJECT_NAME = "my-project"
 
-def init_project(root: Path, name: str) -> dict[str, str]:
+
+def init_project(root: Path, name: str = DEFAULT_PROJECT_NAME) -> dict[str, str]:
     """Create the `.pvm/` directory tree and initial project metadata."""
     paths = ProjectPaths(root.resolve())
 

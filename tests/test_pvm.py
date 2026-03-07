@@ -56,6 +56,15 @@ def test_init_creates_valid_project(tmp_path: Path) -> None:
     assert (tmp_path / ".pvm" / "config.yaml").exists()
 
 
+def test_init_uses_default_name(tmp_path: Path) -> None:
+    project = PVMProject(tmp_path)
+    result = project.init()
+
+    assert project.is_valid() is True
+    assert result["name"] == "my-project"
+    assert project.load_config()["name"] == "my-project"
+
+
 def test_invalid_project_raises(tmp_path: Path) -> None:
     project = PVMProject(tmp_path)
     assert project.is_valid() is False
@@ -239,6 +248,22 @@ def test_cli_init_and_list(tmp_path: Path) -> None:
     )
 
     assert json.loads(result.stdout) == []
+
+
+def test_cli_init_uses_default_name(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout)["name"] == "my-project"
 
 
 def test_cli_template(tmp_path: Path) -> None:
