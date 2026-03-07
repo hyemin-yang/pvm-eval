@@ -24,8 +24,22 @@ class PVMProject:
         return cls(Path.cwd())
 
     def is_valid(self) -> bool:
-        """Return whether the current root contains a `.pvm/` project."""
-        return self.paths.project_dir.exists() and self.paths.project_dir.is_dir()
+        """Return whether the current root contains the minimum `.pvm/` layout."""
+        required_dirs = (
+            self.paths.project_dir,
+            self.paths.settings_dir,
+            self.paths.prompts_dir,
+            self.paths.snapshots_dir,
+            self.paths.snapshot_versions_dir,
+        )
+        required_files = (
+            self.paths.config_file,
+            self.paths.template_file,
+            self.paths.snapshot_history_file,
+        )
+        return all(path.exists() and path.is_dir() for path in required_dirs) and all(
+            path.exists() and path.is_file() for path in required_files
+        )
 
     def require_valid(self) -> None:
         """Raise if the current root is not an initialized pvm project."""

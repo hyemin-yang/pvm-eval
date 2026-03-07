@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pvm.core.errors import AlreadyInitializedError
+from pvm.core.errors import AlreadyInitializedError, NotValidProjectError
 from pvm.core.paths import ProjectPaths
 from pvm.storage.json_io import write_text
 from pvm.storage.time import utc_now_iso
@@ -54,6 +54,26 @@ def init_project(root: Path, name: str) -> dict[str, str]:
     )
     dump_yaml(paths.template_file, DEFAULT_TEMPLATE)
     write_text(paths.snapshot_history_file, "")
+
+    required_dirs = (
+        paths.project_dir,
+        paths.settings_dir,
+        paths.prompts_dir,
+        paths.snapshots_dir,
+        paths.snapshot_versions_dir,
+    )
+    required_files = (
+        paths.config_file,
+        paths.template_file,
+        paths.snapshot_history_file,
+    )
+    is_valid = all(path.exists() and path.is_dir() for path in required_dirs) and all(
+        path.exists() and path.is_file() for path in required_files
+    )
+    if not is_valid:
+        raise NotValidProjectError(
+            f"Initialized project is missing required files: {paths.project_dir}"
+        )
 
     return {
         "project_id": project_id,
