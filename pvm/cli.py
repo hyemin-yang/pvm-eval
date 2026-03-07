@@ -26,7 +26,7 @@ def _project() -> PVMProject:
 
 
 @app.command("init")
-def init(name: str) -> None:
+def init(name: str = typer.Argument("my-project")) -> None:
     """Initialize a pvm project."""
     _print_json(_project().init(name))
 

@@ -60,7 +60,7 @@ class PVMProject:
                 f"Current directory is not a valid pvm project: {self.root}"
             )
 
-    def init(self, name: str) -> dict[str, Any]:
+    def init(self, name: str = "my-project") -> dict[str, Any]:
         """Initialize a new project in the current root."""
         return init_project(self.root, name=name)
 
