@@ -26,6 +26,34 @@ Print the default YAML template:
 pvm template
 ```
 
+To create a new template file directly:
+
+```bash
+pvm template > prompt.yaml
+```
+
+The default output looks like this:
+
+```yaml
+id: "intent_classifier"
+description: "Classify the user's intent"
+author: "alice"
+
+llm:
+  provider: "openai"
+  model: "gpt-4.1"
+  params:
+    temperature: 0.2
+    max_tokens: 300
+
+prompt: |
+  Classify the user's intent.
+
+input_variables:
+  - user_input
+  - history
+```
+
 ## Prompt Commands
 
 ### `pvm add`
