@@ -1,525 +1,233 @@
-# PVM MVP Implementation TODO
+# PVM MVP Implementation Status
 
-이 문서는 [`DESIGN.md`](/home/wjdgh/pvm/pvm/DESIGN.md)를 구현 순서 기준으로 바로 실행 가능한 TODO로 풀어쓴 것이다.
+이 문서는 `DESIGN.md` 기준 MVP 구현 결과를 현재 코드 상태로 요약한 것이다.
 
-## 원칙
+## 현재 상태
 
-- 먼저 Python 라이브러리 구현
-- CLI는 마지막 단계에서 얇게 래핑
-- 각 단계는 파일 시스템 결과와 테스트 가능성을 기준으로 완료 처리
-- MVP 범위 밖 기능은 TODO에 넣지 않음
+- MVP 구현 완료
+- 패키지 레이아웃은 루트 `pvm/`
+- CLI는 `Typer` 기반
+- 테스트는 `pytest` 기반
 
-## 1. 패키지 골격 구성
+## 구현 완료 범위
 
-목표:
+### 1. 패키지 골격
 
-- `src/pvm/` 기본 패키지 구조 생성
-- 외부 진입점 `PVMProject` 정의
-- 공통 예외와 경로 유틸 준비
+완료:
 
-만들 것:
+- [x] `pvm/__init__.py`
+- [x] `pvm/project.py`
+- [x] `pvm/core/errors.py`
+- [x] `pvm/core/paths.py`
+- [x] `pvm/config/`
+- [x] `pvm/prompts/`
+- [x] `pvm/snapshots/`
+- [x] `pvm/storage/`
 
-- `src/pvm/__init__.py`
-- `src/pvm/project.py`
-- `src/pvm/core/errors.py`
-- `src/pvm/core/paths.py`
-- `src/pvm/core/types.py`
-- `src/pvm/config/__init__.py`
-- `src/pvm/prompts/__init__.py`
-- `src/pvm/snapshots/__init__.py`
-- `src/pvm/storage/__init__.py`
+결과:
 
-TODO:
+- `from pvm.project import PVMProject` 사용 가능
+- 경로 계산과 예외 타입이 모듈화됨
 
-- [x] `src/pvm/` 패키지 디렉토리 생성
-- [x] `PVMProject` 클래스 골격 생성
-- [x] `PVMProject.cwd()` 진입점 추가
-- [x] 예외 타입 정의
-- [x] `.pvm/`, `prompts/`, `snapshots/` 경로 계산 헬퍼 추가
-- [x] 기능 모듈 import 경로 정리
+### 2. 프로젝트 초기화
 
-완료 조건:
+완료:
 
-- `from pvm.project import PVMProject`가 동작한다
-- 프로젝트 경로 계산 로직이 한 곳에 모여 있다
+- [x] `.pvm/` 프로젝트 초기화
+- [x] `project_id` ULID 생성
+- [x] `config.yaml` 생성
+- [x] `settings/template.yaml` 생성
+- [x] `prompts/` 생성
+- [x] `snapshots/versions/` 생성
+- [x] `snapshots/history.jsonl` 생성
+- [x] 최소 필수 구조 유효성 검사
 
-## 2. 프로젝트 초기화 구현
+현재 동작:
 
-목표:
+- `pvm init [name]`
+- 이름 생략 시 `my-project`
 
-- `.pvm/` 프로젝트 초기화 가능
-- `project_id`, `name`, `created_at`를 포함한 `config.yaml` 생성
-- 기본 디렉토리와 템플릿 파일 생성
+### 3. 저장 유틸
 
-만들 것:
+완료:
 
-- `src/pvm/config/init_project.py`
-- 필요 시 `src/pvm/config/load_config.py`
-- 필요 시 `src/pvm/config/load_template.py`
+- [x] JSON load/save
+- [x] YAML load/save
+- [x] checksum 유틸
+- [x] JSONL history append
+- [x] semver patch/minor/major bump
+- [x] UTC timestamp 유틸
+- [x] ULID 생성 유틸
 
-TODO:
+### 4. Prompt 추가
 
-- [x] 유효한 프로젝트 여부 검사 함수 추가
-- [x] `.pvm/`가 이미 있으면 초기화 방어 처리
-- [x] `project_id` ULID 생성 유틸 연결
-- [x] `.pvm/config.yaml` 생성
-- [x] `.pvm/settings/template.yaml` 생성
-- [x] `.pvm/prompts/` 생성
-- [x] `.pvm/snapshots/versions/` 생성
-- [x] `.pvm/snapshots/history.jsonl` 생성
-- [x] `PVMProject.init(name)` 구현
+완료:
 
-완료 조건:
-
-- 빈 디렉토리에서 `init` 후 설계한 `.pvm/` 구조가 생성된다
-- `config.yaml`에 `project_id`, `name`, `created_at`가 기록된다
-- `init` 완료 직후 최소 필수 `.pvm/` 구조 검증이 통과한다
-
-## 3. 공통 저장 유틸 구현
-
-목표:
-
-- JSON/YAML/텍스트/히스토리/버전 유틸 완성
-- 이후 유스케이스에서 공통 재사용 가능하도록 정리
-
-만들 것:
-
-- `src/pvm/storage/json_io.py`
-- `src/pvm/storage/yaml_io.py`
-- `src/pvm/storage/checksum.py`
-- `src/pvm/storage/history.py`
-- `src/pvm/storage/semver.py`
-- 필요 시 timestamp 유틸 파일
-
-TODO:
-
-- [x] JSON load/save 함수 구현
-- [x] YAML load/save 함수 구현
-- [x] UTF-8 고정 텍스트 저장 정책 반영
-- [x] dict/list 정규화 checksum 함수 구현
-- [x] semver patch 증가 함수 구현
-- [x] UTC ISO 8601 timestamp 함수 구현
-- [x] JSONL append 유틸 구현
-
-완료 조건:
-
-- 파일 저장/로드 로직이 유스케이스 코드에서 중복되지 않는다
-- checksum, semver, history append를 독립 테스트할 수 있다
-
-## 4. Prompt 추가 기능 구현
-
-목표:
-
-- YAML 템플릿을 prompt version 아티팩트로 저장
-- 중복 추가 시 no-op 처리
-- prompt별 history 기록
-
-만들 것:
-
-- `src/pvm/prompts/add.py`
-
-TODO:
-
-- [x] 템플릿 YAML 로드
-- [x] 필수 필드 `id`, `llm`, `prompt` 검증
+- [x] YAML 템플릿 로드 및 검증
 - [x] `id` 유효성 검사
-- [x] prompt 디렉토리 없으면 초기 구조 생성
-- [x] 최신 버전 조회
-- [x] 다음 patch 버전 계산
-- [x] 최신 버전과 checksum 비교
-- [x] 동일 내용이면 `changed=False` 결과 반환
-- [x] 새 버전 디렉토리 생성
-- [x] `prompt.md` 저장
-- [x] `model_config.json` 저장
-- [x] `metadata.json` 저장
-- [x] `template.yaml` 저장
-- [x] `info.yaml` 초기 생성 또는 안정 메타 갱신 규칙 반영
-- [x] `history.jsonl`에 `add` 이벤트 append
-- [x] `PVMProject.add_prompt(path)` 연결
+- [x] prompt 아티팩트 저장
+- [x] 중복 checksum no-op 처리
+- [x] `info.yaml` 생성
+- [x] `history.jsonl` append
 
-완료 조건:
+현재 동작:
 
-- 첫 add 시 `0.1.0` 생성
-- 같은 내용 add 시 새 버전이 생기지 않는다
-- 변경된 내용 add 시 patch가 증가한다
+- `pvm add <file>`
+- `pvm add <file> --minor`
+- `pvm add <file> --major`
+- 첫 버전은 항상 `0.1.0`
+- 동일 내용이면 `No changes`
 
-## 5. Prompt 조회 기능 구현
+### 5. Prompt 조회
 
-목표:
+완료:
 
-- id 목록, 버전 목록, info, prompt 본문 조회 가능
-- production 기준 조회와 특정 버전 조회 모두 지원
+- [x] prompt id 목록 조회
+- [x] prompt 버전 목록 조회
+- [x] prompt info 조회
+- [x] 특정 버전 조회
+- [x] production 기준 조회
+- [x] production 없을 때 latest fallback
 
-만들 것:
+현재 동작:
 
-- `src/pvm/prompts/list_ids.py`
-- `src/pvm/prompts/get_info.py`
-- `src/pvm/prompts/get.py`
+- `pvm list`
+- `pvm list --id <id>`
+- `pvm get <id>`
+- `pvm get <id> --version <version>`
+- `pvm id <id>`
+- `pvm id <id> --info`
+- `pvm id <id> --list`
 
-TODO:
+### 6. Production 관리
 
-- [x] prompt id 목록 조회 구현
-- [x] prompt 버전 목록 조회 구현
-- [x] `info.yaml`, `production.json`, 최신 버전 조합 조회 구현
-- [x] 특정 버전 prompt 읽기 구현
-- [x] production 버전 prompt 읽기 구현
-- [x] 반환 dict 스키마 통일
-- [x] `PVMProject` 메서드 연결
+완료:
 
-완료 조건:
+- [x] deploy
+- [x] rollback
+- [x] append-only production history
+- [x] repeated deploy no-op 처리
 
-- prompt id/버전 목록을 안정적으로 조회할 수 있다
-- production 미지정 상태와 지정 상태를 구분해 읽을 수 있다
+현재 동작:
 
-## 6. Production 관리 구현
+- `pvm deploy <id>`
+- `pvm deploy <id> <version>`
+- `pvm rollback <id>`
 
-목표:
+규칙:
 
-- 특정 버전을 production으로 배포
-- 이전 운영 버전으로 rollback
-- append-only 운영 이력 유지
+- `deploy`에서 version 생략 시 latest deploy
+- 현재 production과 동일한 version deploy는 no-op
+- rollback 대상이 없으면 `No rollback target`
 
-만들 것:
+### 7. Diff
 
-- `src/pvm/prompts/deploy.py`
-- `src/pvm/prompts/rollback.py`
+완료:
 
-TODO:
+- [x] prompt unified diff
+- [x] prompt diff 요약 정보
+- [x] snapshot diff
 
-- [x] 대상 버전 존재 확인 로직 구현
-- [x] `deploy` no-op 정책 구현
-- [x] `production.json` 갱신 구현
-- [x] `deploy` history 이벤트 append 구현
-- [x] 현재 production 읽기 구현
-- [x] history 기반 rollback 후보 탐색 구현
-- [x] rollback no-op 정책 구현
-- [x] `rollback` history 이벤트 append 구현
-- [x] `PVMProject.deploy(id, version)` 연결
-- [x] `PVMProject.rollback(id)` 연결
+현재 동작:
 
-완료 조건:
+- `pvm diff <id> <from_version> <to_version>`
+- `pvm snapshot diff <from_version> <to_version>`
 
-- 존재하는 버전은 production 전환 가능
-- 존재하지 않는 버전은 no-op 처리
-- rollback 시 history 삭제 없이 이전 production으로 복귀한다
+### 8. Snapshot
 
-## 7. Diff 기능 구현
+완료:
 
-목표:
-
-- prompt 간 diff
-- snapshot 간 diff
-
-만들 것:
-
-- `src/pvm/prompts/diff.py`
-- `src/pvm/snapshots/diff.py`
-
-TODO:
-
-- [x] `prompt.md` unified diff 생성 구현
-- [x] prompt 길이 변화량 계산
-- [x] 추가 줄 수 계산
-- [x] 삭제 줄 수 계산
-- [x] model config 변경 여부 비교
-- [x] checksum 전/후 반환
-- [x] snapshot manifest 비교 구현
-- [x] `added_ids`, `removed_ids`, `changed_ids` 분류
-- [x] `changed_ids`에 `from_version`, `to_version` 포함
-- [x] `PVMProject.diff_prompt(...)` 연결
-- [x] `PVMProject.diff_snapshot(...)` 연결
-
-완료 조건:
-
-- 두 prompt version 차이를 요약과 diff 텍스트로 반환할 수 있다
-- 두 snapshot 차이를 id 단위로 분류해 반환할 수 있다
-
-## 8. Snapshot 기능 구현
-
-목표:
-
-- 현재 production 상태를 snapshot으로 저장
-- snapshot 목록/정의/실제 내용 조회 가능
-
-만들 것:
-
-- `src/pvm/snapshots/create.py`
-- `src/pvm/snapshots/get.py`
-- `src/pvm/snapshots/list.py`
-- `src/pvm/snapshots/read.py`
-
-TODO:
-
-- [x] 모든 prompt id 순회 구현
-- [x] production 설정된 id만 수집
-- [x] snapshot 다음 patch 버전 계산
-- [x] snapshot manifest 생성
-- [x] `.pvm/snapshots/versions/{version}.json` 저장
+- [x] snapshot create
+- [x] snapshot list
+- [x] snapshot get
+- [x] snapshot read
 - [x] snapshot history append
-- [x] snapshot 버전 목록 조회 구현
-- [x] snapshot manifest 조회 구현
-- [x] snapshot read 구현
-- [x] manifest 기준 실제 prompt/llm/metadata 펼치기 구현
-- [x] `PVMProject.create_snapshot()` 연결
-- [x] `PVMProject.list_snapshots()` 연결
-- [x] `PVMProject.get_snapshot(version)` 연결
-- [x] `PVMProject.read_snapshot(version)` 연결
 
-완료 조건:
+현재 동작:
 
-- production 상태가 snapshot 파일로 보존된다
-- snapshot 정의와 실제 펼친 내용을 각각 읽을 수 있다
+- `pvm snapshot create`
+- `pvm snapshot create --minor`
+- `pvm snapshot create --major`
+- `pvm snapshot list`
+- `pvm snapshot get <version>`
+- `pvm snapshot read <version>`
 
-## 9. 테스트 작성
+규칙:
 
-목표:
+- 기본 bump는 patch
+- 첫 snapshot version은 항상 `0.1.0`
 
-- 핵심 유스케이스 회귀 테스트 확보
-- 파일 시스템 결과까지 검증
+### 9. CLI
 
-만들 것:
+완료:
 
-- 테스트 디렉토리 구조
-- pytest 기반 테스트 파일들
+- [x] Typer 기반 CLI 엔트리포인트
+- [x] JSON 출력 유틸
+- [x] project summary 출력
+- [x] traceback 없는 예상 가능 에러 처리
 
-TODO:
+현재 명령:
+
+- [x] `pvm init [name]`
+- [x] `pvm add <file> [--minor|--major]`
+- [x] `pvm deploy <id> [version]`
+- [x] `pvm rollback <id>`
+- [x] `pvm get <id> [--version <version>]`
+- [x] `pvm diff <id> <from_version> <to_version>`
+- [x] `pvm list [--id <id>]`
+- [x] `pvm id <id> [--info] [--list]`
+- [x] `pvm log [--id <id>]`
+- [x] `pvm project`
+- [x] `pvm template`
+- [x] `pvm snapshot create [--minor|--major]`
+- [x] `pvm snapshot list`
+- [x] `pvm snapshot get <version>`
+- [x] `pvm snapshot read <version>`
+- [x] `pvm snapshot diff <from_version> <to_version>`
+
+### 10. 테스트
+
+완료:
 
 - [x] init 테스트
 - [x] invalid project 테스트
 - [x] add 첫 버전 생성 테스트
-- [x] add patch 증가 테스트
+- [x] add patch/minor/major 테스트
 - [x] add 동일 내용 no-op 테스트
 - [x] deploy 테스트
+- [x] repeated deploy no-op 테스트
 - [x] rollback 테스트
+- [x] get latest fallback 테스트
 - [x] prompt diff 테스트
-- [x] snapshot create 테스트
-- [x] snapshot get 테스트
-- [x] snapshot read 테스트
-- [x] snapshot diff 테스트
-- [x] 생성된 파일 내용 검증 추가
+- [x] snapshot create/get/read/diff 테스트
+- [x] CLI 스모크 테스트
+- [x] CLI 예상 가능 에러 메시지 테스트
 
-완료 조건:
+실행:
 
-- 핵심 라이브러리 기능에 회귀 테스트가 있다
-- return 값뿐 아니라 실제 파일 구조와 내용도 검증한다
+```bash
+poetry run python -m pytest -q
+```
 
-## 10. CLI 래퍼 추가
+## 브랜치 구현 이력
 
-목표:
+완료된 구현 흐름:
 
-- 라이브러리 API 위에 얇은 CLI 제공
-- 출력 formatting만 CLI 레이어에서 처리
+- `feat/bootstrap`
+- `feat/prompt-core`
+- `feat/snapshot-diff`
+- `feat/cli-and-tests`
 
-만들 것:
+후속 개선 브랜치:
 
-- CLI 엔트리포인트 모듈
-- 서브커맨드별 인자 파서
+- 설치/README 정리
+- flat package layout 전환
+- CLI 에러 메시지 정리
+- `project` 명령 개선
+- semver bump 옵션 추가
 
-TODO:
+## 현재 문서 기준 참고
 
-- [x] `pvm init`
-- [x] `pvm add`
-- [x] `pvm deploy`
-- [x] `pvm rollback`
-- [x] `pvm get`
-- [x] `pvm diff`
-- [x] `pvm snapshot create`
-- [x] `pvm snapshot list`
-- [x] `pvm snapshot get`
-- [x] `pvm snapshot read`
-- [x] `pvm snapshot diff`
-- [x] `pvm list`
-- [x] `pvm id`
-- [x] `pvm log`
-- [x] `pvm tree`
-- [x] no-op 메시지 처리
-- [x] 사람이 읽기 쉬운 출력 포맷 정리
-
-완료 조건:
-
-- CLI는 입력 파싱과 출력만 담당한다
-- 실제 동작은 모두 `PVMProject` 메서드를 호출한다
-
-## 권장 우선순위
-
-실제 구현은 문서 순서를 그대로 따르기보다, "빨리 동작하는 세로 슬라이스를 만들고 바로 검증하는 순서"가 낫다.
-
-### Phase 1. 기반 준비
-
-순서:
-
-1. 1단계 패키지 골격 구성
-2. 3단계 공통 저장 유틸 구현
-3. 2단계 프로젝트 초기화 구현
-
-이유:
-
-- 경로, 예외, 저장 유틸이 먼저 있어야 이후 유스케이스 코드가 단순해진다.
-- `init`은 저장 유틸 위에서 바로 구현하는 편이 중복이 적다.
-
-완료 기준:
-
-- 빈 디렉토리에서 `.pvm/` 프로젝트 생성 가능
-- `config.yaml`과 템플릿 파일이 정상 생성됨
-
-### Phase 2. Prompt 기본 흐름 완성
-
-순서:
-
-1. 4단계 prompt add
-2. 5단계 prompt 조회
-3. 6단계 production 관리
-
-이유:
-
-- `add -> get -> deploy/rollback` 흐름이 닫혀야 prompt 도메인이 usable 상태가 된다.
-- snapshot보다 먼저 prompt 라이프사이클을 안정화하는 편이 테스트와 디버깅이 쉽다.
-
-완료 기준:
-
-- prompt version 생성 가능
-- production 조회/배포/롤백 가능
-
-### Phase 3. 테스트 1차 고정
-
-순서:
-
-1. 9단계 중 init/add/get/deploy/rollback 관련 테스트 먼저 작성
-
-이유:
-
-- snapshot과 diff로 넘어가기 전에 prompt 코어를 고정해야 회귀가 줄어든다.
-- 이 단계에서 파일 구조 검증까지 같이 묶는 것이 좋다.
-
-완료 기준:
-
-- core prompt 흐름에 대한 회귀 테스트 확보
-
-### Phase 4. Snapshot 기능
-
-순서:
-
-1. 8단계 snapshot 기능 구현
-
-이유:
-
-- snapshot은 prompt production 상태가 안정된 뒤에 올리는 게 자연스럽다.
-- diff보다 먼저 snapshot 실체를 만들어야 snapshot diff도 의미가 생긴다.
-
-완료 기준:
-
-- snapshot create/list/get/read 가능
-
-### Phase 5. Diff 기능
-
-순서:
-
-1. 7단계 prompt diff
-2. 7단계 snapshot diff
-
-이유:
-
-- diff는 이미 저장된 버전/스냅샷이 있어야 검증이 쉽다.
-- snapshot 실체 없이 snapshot diff부터 만들면 테스트 세팅이 번거롭다.
-
-완료 기준:
-
-- prompt diff와 snapshot diff 모두 결과 dict를 안정적으로 반환
-
-### Phase 6. 테스트 2차 고정
-
-순서:
-
-1. 9단계 중 diff/snapshot 관련 테스트 추가
-
-이유:
-
-- MVP 코어가 완성된 시점에서 전체 회귀 테스트를 마무리한다.
-
-완료 기준:
-
-- init/add/get/deploy/rollback/diff/snapshot 전체 테스트 확보
-
-### Phase 7. CLI 래퍼
-
-순서:
-
-1. 10단계 전체
-
-이유:
-
-- CLI는 라이브러리 API가 고정된 뒤 붙이는 게 가장 싸다.
-
-완료 기준:
-
-- 주요 라이브러리 기능을 CLI로 호출 가능
-
-## 체크포인트
-
-- Phase 1 완료 시: 라이브러리 뼈대와 프로젝트 초기화 가능
-- Phase 1 완료 시: 라이브러리 뼈대와 프로젝트 초기화, 최소 구조 validation 가능
-- Phase 2 완료 시: prompt version 관리 기능 usable
-- Phase 3 완료 시: prompt 코어 회귀 안정성 확보
-- Phase 4~5 완료 시: snapshot과 diff를 포함한 MVP 코어 완성
-- Phase 6 완료 시: 전체 라이브러리 회귀 테스트 확보
-- Phase 7 완료 시: 사용자 CLI 진입점 제공
-
-## 브랜치 전략
-
-구현은 아래 4개 브랜치로 나눠 진행한다.
-
-### `feat/bootstrap`
-
-범위:
-
-- Phase 1
-
-포함 내용:
-
-- 패키지 골격
-- 공통 저장 유틸
-- `init`
-
-### `feat/prompt-core`
-
-범위:
-
-- Phase 2
-- 필요 시 Phase 3 일부
-
-포함 내용:
-
-- `add`
-- `get`
-- `list`
-- `deploy`
-- `rollback`
-- prompt 코어 관련 테스트 일부
-
-### `feat/snapshot-diff`
-
-범위:
-
-- Phase 4
-- Phase 5
-
-포함 내용:
-
-- `snapshot create`
-- `snapshot list`
-- `snapshot get`
-- `snapshot read`
-- `prompt diff`
-- `snapshot diff`
-
-### `feat/cli-and-tests`
-
-범위:
-
-- Phase 6
-- Phase 7
-
-포함 내용:
-
-- 전체 회귀 테스트 보강
-- CLI 래퍼 구현
+- 설계: `DESIGN.md`
+- CLI 사용법: `CLI.md`
+- 사용자 개요: `README.md`
