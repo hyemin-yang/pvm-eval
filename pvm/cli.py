@@ -59,7 +59,7 @@ def add(template: Path) -> None:
     """Add a prompt template as a new immutable version."""
     result = _project().add_prompt(template)
     if not result["changed"]:
-        print("변경 없음")
+        print("No changes")
         return
     _print_json(result)
 
@@ -73,9 +73,9 @@ def deploy(
     result = _project().deploy(prompt_id, version)
     if not result["changed"]:
         if result.get("reason") == "already_deployed":
-            print("이미 production 버전")
+            print("Already deployed to production")
         else:
-            print("없는 버전")
+            print("Version not found")
         return
     _print_json(result)
 
@@ -85,7 +85,7 @@ def rollback(prompt_id: str = typer.Argument(..., metavar="ID")) -> None:
     """Rollback a prompt to the previous production version."""
     result = _project().rollback(prompt_id)
     if not result["changed"]:
-        print("되돌릴 기록 없음")
+        print("No rollback target")
         return
     _print_json(result)
 
