@@ -74,10 +74,12 @@ class PVMProject:
         self.require_valid()
         return load_template(self.root)
 
-    def add_prompt(self, template_path: str | Path) -> dict[str, Any]:
+    def add_prompt(
+        self, template_path: str | Path, bump_level: str = "patch"
+    ) -> dict[str, Any]:
         """Create a new prompt version from a YAML template file."""
         self.require_valid()
-        return add_prompt(self.root, Path(template_path))
+        return add_prompt(self.root, Path(template_path), bump_level=bump_level)
 
     def list_prompt_ids(self) -> list[str]:
         """List all prompt ids in the current project."""
@@ -116,10 +118,10 @@ class PVMProject:
         self.require_valid()
         return diff_prompt_versions(self.root, prompt_id, from_version, to_version)
 
-    def create_snapshot(self) -> dict[str, Any]:
+    def create_snapshot(self, bump_level: str = "patch") -> dict[str, Any]:
         """Create a snapshot from the current production prompt set."""
         self.require_valid()
-        return create_snapshot(self.root)
+        return create_snapshot(self.root, bump_level=bump_level)
 
     def list_snapshots(self) -> list[str]:
         """List snapshot versions in the current project."""

@@ -12,10 +12,10 @@ from pvm.storage.json_io import dump_json, load_json
 from pvm.storage.time import utc_now_iso
 
 
-def create_snapshot(root: Path) -> dict[str, Any]:
+def create_snapshot(root: Path, bump_level: str = "patch") -> dict[str, Any]:
     """Create a snapshot of the current production prompt set."""
     paths = ProjectPaths(root.resolve())
-    version = get_next_snapshot_version(paths)
+    version = get_next_snapshot_version(paths, bump_level=bump_level)
     created_at = utc_now_iso()
     prompts: dict[str, Any] = {}
 
