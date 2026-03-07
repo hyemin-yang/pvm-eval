@@ -209,3 +209,29 @@ def test_cli_init_and_list(tmp_path: Path) -> None:
     )
 
     assert json.loads(result.stdout) == []
+
+
+def test_cli_template(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd() / "src")
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "template"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "id: intent_classifier" in result.stdout
+    assert "llm:" in result.stdout
