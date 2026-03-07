@@ -128,6 +128,20 @@ def test_deploy_and_get_production(tmp_path: Path) -> None:
     assert prompt["version"] == "0.1.0"
 
 
+def test_get_uses_latest_when_production_is_missing(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    project.add_prompt(template)
+
+    _write_template(template, prompt="classify carefully", temperature=0.3)
+    project.add_prompt(template)
+
+    prompt = project.get_prompt("intent_classifier")
+
+    assert prompt["version"] == "0.1.1"
+
+
 def test_deploy_without_version_uses_latest(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     template = tmp_path / "prompt.yaml"
@@ -399,6 +413,90 @@ def test_cli_hides_traceback_for_domain_errors(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "Traceback" not in result.stderr
     assert "not a valid pvm project" in result.stderr
+
+
+def test_cli_get_uses_latest_when_production_is_missing(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    _write_template(template, prompt="classify carefully", temperature=0.3)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "get", "intent_classifier"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout)["version"] == "0.1.1"
+
+
+def test_cli_get_missing_explicit_version_returns_error_without_traceback(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(Path.cwd())
+
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    template = tmp_path / "prompt.yaml"
+    _write_template(template)
+    subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "add", str(template)],
+        cwd=tmp_path,
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pvm.cli", "get", "intent_classifier", "--version", "9.9.9"],
+        cwd=tmp_path,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert "Prompt version not found: intent_classifier@9.9.9" in result.stderr
 
 
 def test_cli_project_shows_project_summary(tmp_path: Path) -> None:
