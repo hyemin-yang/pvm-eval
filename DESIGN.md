@@ -17,6 +17,8 @@
 ### Project
 
 - 하나의 프로젝트는 현재 디렉토리의 `.pvm/` 디렉토리로 식별한다.
+- 프로젝트의 공식 식별자는 `.pvm/config.yaml`에 저장된 `project_id`다.
+- `project_id`는 `init` 시 자동 생성되는 ULID다.
 - 현재 디렉토리에 `.pvm/`가 없으면 `Not Valid Project`
 - 부모 디렉토리 탐색은 하지 않는다.
 
@@ -24,14 +26,16 @@
 
 - 하나의 프롬프트는 YAML 템플릿 파일 하나로 정의된다.
 - YAML 내부의 `id`가 해당 프롬프트의 유일 식별자다.
-- `id`는 "이 프롬프트가 어떤 역할인지"를 의미한다.
+- `id`는 사람이 읽기 좋은 식별자이며, 이 프롬프트의 역할 이름으로도 사용한다.
+- MVP에서는 `id` 변경을 지원하지 않는다.
+- `id`에는 공백과 `/`를 허용하지 않는다.
   - 예: `intent_classifier`, `planner`, `safety_guard`
 
 ### Prompt Version
 
 - 각 `id`는 독립적으로 semver(`MAJOR.MINOR.PATCH`) 버전을 가진다.
 - MVP에서 `add`는 patch만 자동 증가시킨다.
-- 최초 버전은 `0.1.0`
+- 최초 버전은 `0.1.0`이다.
 
 ### Production
 
@@ -43,6 +47,7 @@
 - snapshot은 현재 시점의 전체 production 조합을 묶어 저장한 버전이다.
 - 즉, `id -> production version` 집합의 스냅샷이다.
 - snapshot도 semver를 사용한다.
+- snapshot 최초 버전은 `0.1.0`이다.
 
 ---
 
@@ -85,6 +90,7 @@ input_variables:
 ### 템플릿 설계 원칙
 
 - `prompt`는 단일 문자열 프롬프트 본문이다.
+- `id`는 별도의 `name` 없이 사람이 읽는 대표 식별자로 사용한다.
 - `llm`에는 실제 LLM API/모델 호출에 쓰이는 설정을 저장한다.
 - `description`은 사람이 이 프롬프트의 역할을 이해하기 위한 설명이다.
 - `author`는 해당 프롬프트를 작성하거나 마지막으로 관리한 사람을 기록한다.
@@ -98,7 +104,6 @@ input_variables:
 .pvm/
   config.yaml
   settings/
-    env.yaml
     template.yaml
   prompts/
     {id}/
@@ -134,20 +139,9 @@ input_variables:
 예시:
 
 ```yaml
+project_id: "01JNY2V7B6J9M2R4J6FQG7K8TA"
 name: "my-pvm-project"
 created_at: "2026-03-06T12:00:00Z"
-version_scheme: "semver"
-```
-
-### `.pvm/settings/env.yaml`
-
-프로젝트 환경 설정 저장.
-
-예시:
-
-```yaml
-environment: "dev"
-provider: "openai"
 ```
 
 ### `.pvm/settings/template.yaml`
@@ -344,7 +338,7 @@ history는 삭제하지 않는다. append-only 로그로 유지한다.
 
 - 현재 디렉토리에 `.pvm/` 생성
 - 이미 존재하면 방어
-- 기본 `config.yaml`, `settings/env.yaml`, `settings/template.yaml` 생성
+- 기본 `config.yaml`, `settings/template.yaml` 생성
 
 ### `add`
 
@@ -595,7 +589,6 @@ snapshot = project.read_snapshot("0.1.0")
 - `pvm log --id <id>`
 - `pvm id <id>`
 - `pvm id <id> --info`
-- `pvm id <id> --name`
 - `pvm id <id> --list`
 - `pvm add <file.yaml>`
 - `pvm deploy <id> <version>`
@@ -669,7 +662,6 @@ MVP 구현은 아래 순서로 진행한다.
 - `init` 로직 구현
 - 기본 파일 생성
   - `config.yaml`
-  - `settings/env.yaml`
   - `settings/template.yaml`
   - `prompts/`
   - `snapshots/versions/`
@@ -680,6 +672,8 @@ MVP 구현은 아래 순서로 진행한다.
 - `PVMProject.cwd()`는 현재 작업 디렉토리를 root로 갖는 객체를 반환한다.
 - `PVMProject.require_valid()` 또는 유사한 내부 메서드에서 `.pvm/` 존재를 검사한다.
 - `init`는 현재 디렉토리에 `.pvm/`가 이미 있으면 `AlreadyInitializedError`를 발생시키거나 no-op 정책을 명확히 정한다.
+- `init`는 `config.yaml` 생성 시 `project_id`, `name`, `created_at`를 함께 기록한다.
+- `project_id`는 ULID로 자동 생성한다.
 - 기본 디렉토리는 `mkdir(parents=True, exist_ok=False)`로 생성해 초기화 중복을 방지한다.
 - 기본 파일은 템플릿 문자열 또는 딕셔너리를 YAML/JSON으로 직렬화해 쓴다.
 - `settings/template.yaml`에는 사용자가 바로 복사해 쓸 수 있는 base prompt 템플릿을 넣는다.
@@ -930,8 +924,3 @@ MVP 구현은 아래 순서로 진행한다.
 ## 미정 항목
 
 현재 설계에서 아직 추후 확정 가능한 항목:
-
-- `name` 필드를 별도로 둘지 여부
-- snapshot과 prompt 버전의 초기값 세부 규칙
-- diff 기능을 MVP에 포함할지 여부
-- `env.yaml` 구체 스키마
