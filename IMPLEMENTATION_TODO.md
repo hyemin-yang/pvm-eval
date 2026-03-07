@@ -73,6 +73,7 @@ TODO:
 
 - 빈 디렉토리에서 `init` 후 설계한 `.pvm/` 구조가 생성된다
 - `config.yaml`에 `project_id`, `name`, `created_at`가 기록된다
+- `init` 완료 직후 최소 필수 `.pvm/` 구조 검증이 통과한다
 
 ## 3. 공통 저장 유틸 구현
 
@@ -216,17 +217,17 @@ TODO:
 
 TODO:
 
-- [ ] `prompt.md` unified diff 생성 구현
-- [ ] prompt 길이 변화량 계산
-- [ ] 추가 줄 수 계산
-- [ ] 삭제 줄 수 계산
-- [ ] model config 변경 여부 비교
-- [ ] checksum 전/후 반환
-- [ ] snapshot manifest 비교 구현
-- [ ] `added_ids`, `removed_ids`, `changed_ids` 분류
-- [ ] `changed_ids`에 `from_version`, `to_version` 포함
-- [ ] `PVMProject.diff_prompt(...)` 연결
-- [ ] `PVMProject.diff_snapshot(...)` 연결
+- [x] `prompt.md` unified diff 생성 구현
+- [x] prompt 길이 변화량 계산
+- [x] 추가 줄 수 계산
+- [x] 삭제 줄 수 계산
+- [x] model config 변경 여부 비교
+- [x] checksum 전/후 반환
+- [x] snapshot manifest 비교 구현
+- [x] `added_ids`, `removed_ids`, `changed_ids` 분류
+- [x] `changed_ids`에 `from_version`, `to_version` 포함
+- [x] `PVMProject.diff_prompt(...)` 연결
+- [x] `PVMProject.diff_snapshot(...)` 연결
 
 완료 조건:
 
@@ -249,20 +250,20 @@ TODO:
 
 TODO:
 
-- [ ] 모든 prompt id 순회 구현
-- [ ] production 설정된 id만 수집
-- [ ] snapshot 다음 patch 버전 계산
-- [ ] snapshot manifest 생성
-- [ ] `.pvm/snapshots/versions/{version}.json` 저장
-- [ ] snapshot history append
-- [ ] snapshot 버전 목록 조회 구현
-- [ ] snapshot manifest 조회 구현
-- [ ] snapshot read 구현
-- [ ] manifest 기준 실제 prompt/llm/metadata 펼치기 구현
-- [ ] `PVMProject.create_snapshot()` 연결
-- [ ] `PVMProject.list_snapshots()` 연결
-- [ ] `PVMProject.get_snapshot(version)` 연결
-- [ ] `PVMProject.read_snapshot(version)` 연결
+- [x] 모든 prompt id 순회 구현
+- [x] production 설정된 id만 수집
+- [x] snapshot 다음 patch 버전 계산
+- [x] snapshot manifest 생성
+- [x] `.pvm/snapshots/versions/{version}.json` 저장
+- [x] snapshot history append
+- [x] snapshot 버전 목록 조회 구현
+- [x] snapshot manifest 조회 구현
+- [x] snapshot read 구현
+- [x] manifest 기준 실제 prompt/llm/metadata 펼치기 구현
+- [x] `PVMProject.create_snapshot()` 연결
+- [x] `PVMProject.list_snapshots()` 연결
+- [x] `PVMProject.get_snapshot(version)` 연결
+- [x] `PVMProject.read_snapshot(version)` 연결
 
 완료 조건:
 
@@ -456,6 +457,7 @@ TODO:
 ## 체크포인트
 
 - Phase 1 완료 시: 라이브러리 뼈대와 프로젝트 초기화 가능
+- Phase 1 완료 시: 라이브러리 뼈대와 프로젝트 초기화, 최소 구조 validation 가능
 - Phase 2 완료 시: prompt version 관리 기능 usable
 - Phase 3 완료 시: prompt 코어 회귀 안정성 확보
 - Phase 4~5 완료 시: snapshot과 diff를 포함한 MVP 코어 완성
