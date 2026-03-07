@@ -455,6 +455,6 @@ def test_cli_project_shows_project_summary(tmp_path: Path) -> None:
 
     output = result.stdout.strip()
     assert "project: demo-project" in output
-    assert "id: intent_classifier" in output
-    assert "version: 0.1.0" in output
-    assert "version: 0.1.1 <--- production" in output
+    assert "└── id: intent_classifier" in output
+    assert "├── version: 0.1.0" in output
+    assert "└── version: 0.1.1 <--- production" in output
