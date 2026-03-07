@@ -188,7 +188,7 @@ def test_snapshot_create_get_read_and_diff(tmp_path: Path) -> None:
 
 def test_cli_init_and_list(tmp_path: Path) -> None:
     env = dict(os.environ)
-    env["PYTHONPATH"] = str(Path.cwd() / "src")
+    env["PYTHONPATH"] = str(Path.cwd())
 
     subprocess.run(
         [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
@@ -213,7 +213,7 @@ def test_cli_init_and_list(tmp_path: Path) -> None:
 
 def test_cli_template(tmp_path: Path) -> None:
     env = dict(os.environ)
-    env["PYTHONPATH"] = str(Path.cwd() / "src")
+    env["PYTHONPATH"] = str(Path.cwd())
 
     subprocess.run(
         [sys.executable, "-m", "pvm.cli", "init", "demo-project"],
