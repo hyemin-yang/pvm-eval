@@ -31,12 +31,12 @@
 
 TODO:
 
-- [ ] `src/pvm/` 패키지 디렉토리 생성
-- [ ] `PVMProject` 클래스 골격 생성
-- [ ] `PVMProject.cwd()` 진입점 추가
-- [ ] 예외 타입 정의
-- [ ] `.pvm/`, `prompts/`, `snapshots/` 경로 계산 헬퍼 추가
-- [ ] 기능 모듈 import 경로 정리
+- [x] `src/pvm/` 패키지 디렉토리 생성
+- [x] `PVMProject` 클래스 골격 생성
+- [x] `PVMProject.cwd()` 진입점 추가
+- [x] 예외 타입 정의
+- [x] `.pvm/`, `prompts/`, `snapshots/` 경로 계산 헬퍼 추가
+- [x] 기능 모듈 import 경로 정리
 
 완료 조건:
 
@@ -59,15 +59,15 @@ TODO:
 
 TODO:
 
-- [ ] 유효한 프로젝트 여부 검사 함수 추가
-- [ ] `.pvm/`가 이미 있으면 초기화 방어 처리
-- [ ] `project_id` ULID 생성 유틸 연결
-- [ ] `.pvm/config.yaml` 생성
-- [ ] `.pvm/settings/template.yaml` 생성
-- [ ] `.pvm/prompts/` 생성
-- [ ] `.pvm/snapshots/versions/` 생성
-- [ ] `.pvm/snapshots/history.jsonl` 생성
-- [ ] `PVMProject.init(name)` 구현
+- [x] 유효한 프로젝트 여부 검사 함수 추가
+- [x] `.pvm/`가 이미 있으면 초기화 방어 처리
+- [x] `project_id` ULID 생성 유틸 연결
+- [x] `.pvm/config.yaml` 생성
+- [x] `.pvm/settings/template.yaml` 생성
+- [x] `.pvm/prompts/` 생성
+- [x] `.pvm/snapshots/versions/` 생성
+- [x] `.pvm/snapshots/history.jsonl` 생성
+- [x] `PVMProject.init(name)` 구현
 
 완료 조건:
 
@@ -92,13 +92,13 @@ TODO:
 
 TODO:
 
-- [ ] JSON load/save 함수 구현
-- [ ] YAML load/save 함수 구현
-- [ ] UTF-8 고정 텍스트 저장 정책 반영
-- [ ] dict/list 정규화 checksum 함수 구현
-- [ ] semver patch 증가 함수 구현
-- [ ] UTC ISO 8601 timestamp 함수 구현
-- [ ] JSONL append 유틸 구현
+- [x] JSON load/save 함수 구현
+- [x] YAML load/save 함수 구현
+- [x] UTF-8 고정 텍스트 저장 정책 반영
+- [x] dict/list 정규화 checksum 함수 구현
+- [x] semver patch 증가 함수 구현
+- [x] UTC ISO 8601 timestamp 함수 구현
+- [x] JSONL append 유틸 구현
 
 완료 조건:
 
@@ -461,3 +461,63 @@ TODO:
 - Phase 4~5 완료 시: snapshot과 diff를 포함한 MVP 코어 완성
 - Phase 6 완료 시: 전체 라이브러리 회귀 테스트 확보
 - Phase 7 완료 시: 사용자 CLI 진입점 제공
+
+## 브랜치 전략
+
+구현은 아래 4개 브랜치로 나눠 진행한다.
+
+### `feat/bootstrap`
+
+범위:
+
+- Phase 1
+
+포함 내용:
+
+- 패키지 골격
+- 공통 저장 유틸
+- `init`
+
+### `feat/prompt-core`
+
+범위:
+
+- Phase 2
+- 필요 시 Phase 3 일부
+
+포함 내용:
+
+- `add`
+- `get`
+- `list`
+- `deploy`
+- `rollback`
+- prompt 코어 관련 테스트 일부
+
+### `feat/snapshot-diff`
+
+범위:
+
+- Phase 4
+- Phase 5
+
+포함 내용:
+
+- `snapshot create`
+- `snapshot list`
+- `snapshot get`
+- `snapshot read`
+- `prompt diff`
+- `snapshot diff`
+
+### `feat/cli-and-tests`
+
+범위:
+
+- Phase 6
+- Phase 7
+
+포함 내용:
+
+- 전체 회귀 테스트 보강
+- CLI 래퍼 구현
