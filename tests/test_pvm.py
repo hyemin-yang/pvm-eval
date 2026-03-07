@@ -380,7 +380,7 @@ def test_cli_deploy_same_version_is_noop(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "이미 production 버전"
+    assert result.stdout.strip() == "Already deployed to production"
 
 
 def test_cli_hides_traceback_for_domain_errors(tmp_path: Path) -> None:
