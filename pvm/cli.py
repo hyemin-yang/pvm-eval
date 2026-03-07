@@ -158,6 +158,12 @@ def tree() -> None:
     print(_render_project_tree(_project()))
 
 
+@app.command("project")
+def project() -> None:
+    """Show the current project summary as a logical tree."""
+    print(_render_project_tree(_project()))
+
+
 @app.command("template")
 def template() -> None:
     """Print the default prompt template stored in the project."""
