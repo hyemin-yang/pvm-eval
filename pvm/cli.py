@@ -15,6 +15,29 @@ def _print_json(data: Any) -> None:
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
+def _render_project_tree(project: PVMProject) -> str:
+    """Render the logical project tree as project -> prompt id -> version."""
+    project_name = project.load_config()["name"]
+    prompt_ids = project.list_prompt_ids()
+    if not prompt_ids:
+        return project_name
+
+    lines = [project_name]
+    for prompt_index, prompt_id in enumerate(prompt_ids):
+        is_last_prompt = prompt_index == len(prompt_ids) - 1
+        prompt_prefix = "└── " if is_last_prompt else "├── "
+        lines.append(f"{prompt_prefix}{prompt_id}")
+
+        versions = project.list_prompt_versions(prompt_id)
+        for version_index, version in enumerate(versions):
+            is_last_version = version_index == len(versions) - 1
+            version_prefix = "    " if is_last_prompt else "│   "
+            branch = "└── " if is_last_version else "├── "
+            lines.append(f"{version_prefix}{branch}{version}")
+
+    return "\n".join(lines)
+
+
 app = typer.Typer(help="Prompt version management")
 snapshot_app = typer.Typer(help="Snapshot operations")
 app.add_typer(snapshot_app, name="snapshot")
@@ -131,10 +154,8 @@ def log(prompt_id: str | None = typer.Option(None, "--id", help="Prompt id")) ->
 
 @app.command("tree")
 def tree() -> None:
-    """Show the current `.pvm/` tree."""
-    project = _project()
-    for path in sorted(project.paths.project_dir.rglob("*")):
-        print(path.relative_to(project.root))
+    """Show the logical project tree as project -> prompt id -> version."""
+    print(_render_project_tree(_project()))
 
 
 @app.command("template")
