@@ -239,6 +239,7 @@ Examples:
 
 - invalid project directory
 - missing explicit prompt version
+- invalid semantic version input such as `0.1.0-alpha`
 - mutually exclusive bump options
 
 ## Help
