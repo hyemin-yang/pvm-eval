@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import typer
+import yaml
 
 from pvm.project import PVMProject
 
@@ -127,6 +128,18 @@ def tree() -> None:
     project = _project()
     for path in sorted(project.paths.project_dir.rglob("*")):
         print(path.relative_to(project.root))
+
+
+@app.command("template")
+def template() -> None:
+    """Print the default prompt template stored in the project."""
+    print(
+        yaml.safe_dump(
+            _project().load_template(),
+            allow_unicode=True,
+            sort_keys=False,
+        ).rstrip()
+    )
 
 
 @snapshot_app.command("create")
