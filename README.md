@@ -51,13 +51,13 @@ poetry build
 
 This creates:
 
-- `dist/pvm-0.1.1-py3-none-any.whl`
-- `dist/pvm-0.1.1.tar.gz`
+- `dist/pvm-0.0.0-py3-none-any.whl`
+- `dist/pvm-0.0.0.tar.gz`
 
 You can install the wheel with:
 
 ```bash
-pipx install dist/pvm-0.1.1-py3-none-any.whl
+pipx install dist/pvm-0.0.0-py3-none-any.whl
 ```
 
 ## Quick Start

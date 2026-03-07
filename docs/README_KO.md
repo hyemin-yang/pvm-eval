@@ -55,13 +55,13 @@ poetry build
 
 생성 결과:
 
-- `dist/pvm-0.1.1-py3-none-any.whl`
-- `dist/pvm-0.1.1.tar.gz`
+- `dist/pvm-0.0.0-py3-none-any.whl`
+- `dist/pvm-0.0.0.tar.gz`
 
 wheel 설치:
 
 ```bash
-pipx install dist/pvm-0.1.1-py3-none-any.whl
+pipx install dist/pvm-0.0.0-py3-none-any.whl
 ```
 
 ## 빠른 시작
