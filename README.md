@@ -51,13 +51,13 @@ poetry build
 
 This creates:
 
-- `dist/pvm-0.1.0-py3-none-any.whl`
-- `dist/pvm-0.1.0.tar.gz`
+- `dist/pvm-0.1.1-py3-none-any.whl`
+- `dist/pvm-0.1.1.tar.gz`
 
 You can install the wheel with:
 
 ```bash
-pipx install dist/pvm-0.1.0-py3-none-any.whl
+pipx install dist/pvm-0.1.1-py3-none-any.whl
 ```
 
 ## Quick Start
@@ -207,7 +207,14 @@ Snapshot commands:
 - `pvm snapshot read <version>`
 - `pvm snapshot diff <from_version> <to_version>`
 
-Detailed CLI examples are in `CLI.md`.
+Detailed CLI examples are in `docs/CLI.md`.
+
+Additional documents:
+
+- Korean README: `docs/README_KO.md`
+- Korean CLI guide: `docs/CLI_KO.md`
+- Design: `docs/DESIGN.md`
+- Implementation status: `docs/IMPLEMENTATION_TODO.md`
 
 ## Command Behavior Notes
 
