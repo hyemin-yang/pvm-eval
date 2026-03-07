@@ -16,24 +16,21 @@ def _print_json(data: Any) -> None:
 
 
 def _render_project_tree(project: PVMProject) -> str:
-    """Render the logical project tree as project -> prompt id -> version."""
+    """Render the project summary as labeled project/id/version lines."""
     project_name = project.load_config()["name"]
     prompt_ids = project.list_prompt_ids()
     if not prompt_ids:
-        return project_name
+        return f"project: {project_name}"
 
-    lines = [project_name]
-    for prompt_index, prompt_id in enumerate(prompt_ids):
-        is_last_prompt = prompt_index == len(prompt_ids) - 1
-        prompt_prefix = "└── " if is_last_prompt else "├── "
-        lines.append(f"{prompt_prefix}{prompt_id}")
-
+    lines = [f"project: {project_name}"]
+    for prompt_id in prompt_ids:
+        lines.append(f"id: {prompt_id}")
+        prompt_info = project.get_prompt_info(prompt_id)
+        production = prompt_info["production"]["version"] if prompt_info["production"] else None
         versions = project.list_prompt_versions(prompt_id)
-        for version_index, version in enumerate(versions):
-            is_last_version = version_index == len(versions) - 1
-            version_prefix = "    " if is_last_prompt else "│   "
-            branch = "└── " if is_last_version else "├── "
-            lines.append(f"{version_prefix}{branch}{version}")
+        for version in versions:
+            suffix = " <--- production" if version == production else ""
+            lines.append(f"version: {version}{suffix}")
 
     return "\n".join(lines)
 
@@ -150,12 +147,6 @@ def log(prompt_id: str | None = typer.Option(None, "--id", help="Prompt id")) ->
         print("[]")
         return
     print(history_file.read_text(encoding="utf-8").rstrip())
-
-
-@app.command("tree")
-def tree() -> None:
-    """Show the logical project tree as project -> prompt id -> version."""
-    print(_render_project_tree(_project()))
 
 
 @app.command("project")
