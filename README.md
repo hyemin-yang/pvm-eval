@@ -155,16 +155,29 @@ Run the server on the default port:
 pvm-server
 ```
 
+The default bind address is `127.0.0.1`, so open:
+
+```text
+http://127.0.0.1:8888
+```
+
 Run the server on a custom port:
 
 ```bash
 pvm-server --port 9000
 ```
 
+Then open:
+
+```text
+http://127.0.0.1:9000
+```
+
 Bind a different host or enable reload for local development:
 
 ```bash
 pvm-server --host 127.0.0.1 --port 9000
+pvm-server --host 0.0.0.0 --port 9000
 pvm-server --port 9000 --reload
 ```
 

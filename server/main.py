@@ -84,13 +84,13 @@ async def _not_valid_project(request: Request, exc: NotValidProjectError) -> JSO
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 
-def run(host: str = "0.0.0.0", port: int = 8888, reload: bool = False) -> None:
+def run(host: str = "127.0.0.1", port: int = 8888, reload: bool = False) -> None:
     uvicorn.run("server.main:app", host=host, port=port, reload=reload)
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="pvm-server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host interface to bind")
+    parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind")
     parser.add_argument("--port", type=int, default=8888, help="Port to listen on")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
     args = parser.parse_args(argv)
