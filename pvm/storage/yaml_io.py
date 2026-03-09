@@ -7,9 +7,15 @@ import yaml
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
-    """Load a YAML mapping from disk."""
-    with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle) or {}
+    """Load a YAML mapping from disk, tolerating UTF-8/UTF-16 BOM variants."""
+    raw = path.read_bytes()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        text = raw.decode("utf-16")
+    elif raw.startswith(b"\xef\xbb\xbf"):
+        text = raw.decode("utf-8-sig")
+    else:
+        text = raw.decode("utf-8")
+    data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML mapping in {path}")
     return data
