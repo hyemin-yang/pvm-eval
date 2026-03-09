@@ -1,20 +1,32 @@
 from __future__ import annotations
 
+import locale
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 
-def load_yaml(path: Path) -> dict[str, Any]:
-    """Load a YAML mapping from disk, tolerating UTF-8/UTF-16 BOM variants."""
-    raw = path.read_bytes()
+def _decode_bytes(raw: bytes) -> str:
+    """Decode raw bytes to str, handling all common BOM variants and falling back to the system encoding."""
+    # UTF-32 BOM must be checked before UTF-16 (they share a prefix)
+    if raw.startswith(b"\x00\x00\xfe\xff"):
+        return raw.decode("utf-32-be")
+    if raw.startswith(b"\xff\xfe\x00\x00"):
+        return raw.decode("utf-32-le")
     if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
-        text = raw.decode("utf-16")
-    elif raw.startswith(b"\xef\xbb\xbf"):
-        text = raw.decode("utf-8-sig")
-    else:
-        text = raw.decode("utf-8")
+        return raw.decode("utf-16")
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw.decode("utf-8-sig")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode(locale.getpreferredencoding(False))
+
+
+def load_yaml(path: Path) -> dict[str, Any]:
+    """Load a YAML mapping from disk, tolerating any encoding."""
+    text = _decode_bytes(path.read_bytes())
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML mapping in {path}")
