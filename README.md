@@ -16,16 +16,22 @@ It manages:
 
 Use `pipx` if you want `pvm` available like `git`.
 
-Install from a local checkout:
+CLI only from a local checkout:
 
 ```bash
 pipx install /path/to/pvm
 ```
 
-Install from GitHub:
+CLI only from GitHub:
 
 ```bash
 pipx install "git+https://github.com/OWNER/REPO.git@main"
+```
+
+CLI + server from the package root:
+
+```bash
+pipx install ".[server]"
 ```
 
 Upgrade after changes:
@@ -41,6 +47,13 @@ If you publish version bumps, `pipx upgrade pvm` works as well.
 ```bash
 poetry install -E dev
 poetry run pvm --help
+```
+
+For CLI + server development:
+
+```bash
+poetry install -E dev -E server
+poetry run pvm-server --help
 ```
 
 ### Build a distributable package
@@ -61,6 +74,8 @@ pipx install dist/pvm-0.0.0-py3-none-any.whl
 ```
 
 ## Quick Start
+
+### CLI
 
 Initialize a project in the current directory. If `name` is omitted, `my-project` is used.
 
@@ -119,6 +134,38 @@ Inspect the project summary:
 ```bash
 pvm project
 ```
+
+### Server
+
+Install the server extra first if you want the web UI and API:
+
+```bash
+pipx install ".[server]"
+```
+
+Run the server on the default port:
+
+```bash
+pvm-server
+```
+
+Run the server on a custom port:
+
+```bash
+pvm-server --port 9000
+```
+
+Bind a different host or enable reload for local development:
+
+```bash
+pvm-server --host 127.0.0.1 --port 9000
+pvm-server --port 9000 --reload
+```
+
+Optional environment variables:
+
+- `PVM_STORAGE_ROOT` to override the project storage directory
+- `PVM_DB_PATH` to override the SQLite database path
 
 ## Prompt Template
 
@@ -206,6 +253,10 @@ Snapshot commands:
 - `pvm snapshot get <version>`
 - `pvm snapshot read <version>`
 - `pvm snapshot diff <from_version> <to_version>`
+
+Server command:
+
+- `pvm-server [--host <host>] [--port <port>] [--reload]`
 
 Detailed CLI examples are in `docs/CLI.md`.
 

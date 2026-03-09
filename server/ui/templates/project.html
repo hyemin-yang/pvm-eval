@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — pvm{% endblock %}
+
+{% block breadcrumb %}
+<div class="bg-white border-b border-gray-200 px-6 py-2 text-sm text-gray-500">
+  <div class="max-w-7xl mx-auto flex items-center gap-2">
+    <a href="/" class="hover:text-gray-900">Projects</a>
+    <span>/</span>
+    <span class="text-gray-900 font-medium">{{ project.name }}</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-start justify-between mb-8">
+  <div>
+    <h1 class="text-2xl font-bold">{{ project.name }}</h1>
+    <p class="text-xs text-gray-400 font-mono mt-1">{{ project.id }}</p>
+    <p class="text-xs text-gray-400 mt-0.5">Created {{ project.created_at }}</p>
+  </div>
+  <div class="flex gap-2">
+    <button onclick="document.getElementById('add-prompt-modal').showModal()"
+            class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+      + Add Prompt
+    </button>
+    <form method="POST" action="/projects/{{ project.id }}/snapshots"
+          onsubmit="return confirm('Create a new snapshot?')">
+      <input type="hidden" name="bump_level" value="patch" />
+      <button type="submit"
+              class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+        📸 Snapshot
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Prompts -->
+<section class="mb-10">
+  <h2 class="text-lg font-semibold mb-3">Prompts</h2>
+  {% if project.prompts %}
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="px-5 py-3 text-left">ID</th>
+          <th class="px-5 py-3 text-left">Production</th>
+          <th class="px-5 py-3 text-left">Latest</th>
+          <th class="px-5 py-3 text-left">Description</th>
+          <th class="px-5 py-3 text-left">Author</th>
+          <th class="px-5 py-3 text-left"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for p in project.prompts %}
+        <tr class="hover:bg-gray-50 transition cursor-pointer"
+            onclick="location.href='/projects/{{ project.id }}/prompts/{{ p.id }}'">
+          <td class="px-5 py-3 font-mono font-medium text-gray-900">{{ p.id }}</td>
+          <td class="px-5 py-3">
+            {% if p.production and p.production.version %}
+              <span class="badge-prod text-xs px-2 py-0.5 rounded-full font-mono">
+                {{ p.production.version }}
+              </span>
+            {% else %}
+              <span class="text-gray-400 text-xs">—</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3">
+            <span class="badge-ver text-xs px-2 py-0.5 rounded-full font-mono">
+              {{ p.latest_version or "—" }}
+            </span>
+          </td>
+          <td class="px-5 py-3 text-gray-500 max-w-xs truncate">{{ p.description or "—" }}</td>
+          <td class="px-5 py-3 text-gray-500">{{ p.author or "—" }}</td>
+          <td class="px-5 py-3">
+            <span class="text-green-600 font-medium">View →</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-lg border border-dashed border-gray-300 p-10 text-center text-gray-400">
+    <p class="text-sm">No prompts yet. Add your first prompt.</p>
+  </div>
+  {% endif %}
+</section>
+
+<!-- Snapshots -->
+<section>
+  <h2 class="text-lg font-semibold mb-3">Snapshots</h2>
+  {% if project.snapshots %}
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="px-5 py-3 text-left">Version</th>
+          <th class="px-5 py-3 text-left"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for v in project.snapshots %}
+        <tr class="hover:bg-gray-50 transition">
+          <td class="px-5 py-3 font-mono font-medium">{{ v }}</td>
+          <td class="px-5 py-3">
+            <a href="/projects/{{ project.id }}/snapshots/{{ v }}"
+               class="text-green-600 hover:text-green-800 font-medium">View →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-lg border border-dashed border-gray-300 p-10 text-center text-gray-400">
+    <p class="text-sm">No snapshots yet. Click "Snapshot" to capture current production state.</p>
+  </div>
+  {% endif %}
+</section>
+
+<!-- Project Tree -->
+<section class="mt-10">
+  <h2 class="text-lg font-semibold mb-3">Project Tree</h2>
+  <div class="bg-gray-950 rounded-lg border border-gray-800 p-5 font-mono text-sm leading-relaxed overflow-x-auto">
+
+    {# root #}
+    <div class="text-gray-200">
+      <span class="text-green-400">project:</span> {{ project.name }}
+    </div>
+
+    {% set has_snapshots = project.snapshots | length > 0 %}
+    {% set prompt_count  = project.prompts  | length %}
+
+    {% for p in project.prompts %}
+      {% set is_last_prompt = loop.last and not has_snapshots %}
+      {% set prod_ver = p.production.version if p.production else None %}
+      {% set ver_count = p.versions | length %}
+
+      {# prompt row #}
+      <div class="flex items-baseline mt-0.5">
+        <span class="text-gray-600 select-none whitespace-pre">{{ "└── " if is_last_prompt else "├── " }}</span>
+        <span class="text-blue-400">id:</span>&nbsp;
+        <a href="/projects/{{ project.id }}/prompts/{{ p.id }}"
+           class="text-white hover:text-green-300 transition">{{ p.id }}</a>
+      </div>
+
+      {# version rows #}
+      {% for v in p.versions %}
+        {% set is_last_ver = loop.last %}
+        <div class="flex items-baseline">
+          <span class="text-gray-700 select-none whitespace-pre">{{ "    " if is_last_prompt else "│   " }}</span>
+          <span class="text-gray-600 select-none whitespace-pre">{{ "└── " if is_last_ver else "├── " }}</span>
+          <a href="/projects/{{ project.id }}/prompts/{{ p.id }}?version={{ v }}"
+             class="transition {{ 'text-green-400 font-semibold' if v == prod_ver else 'text-gray-400 hover:text-gray-200' }}">
+            {{ v }}
+          </a>
+          {% if v == prod_ver %}
+          <span class="ml-2 text-green-600 text-xs select-none">← production</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+    {% endfor %}
+
+    {# snapshots #}
+    {% for sv in project.snapshots %}
+      <div class="flex items-baseline mt-0.5">
+        <span class="text-gray-600 select-none whitespace-pre">{{ "└── " if loop.last else "├── " }}</span>
+        <span class="text-purple-400">snapshot:</span>&nbsp;
+        <a href="/projects/{{ project.id }}/snapshots/{{ sv }}"
+           class="text-gray-300 hover:text-white transition">{{ sv }}</a>
+      </div>
+    {% endfor %}
+
+    {% if not project.prompts and not project.snapshots %}
+    <div class="text-gray-600 mt-1">└── (empty)</div>
+    {% endif %}
+
+  </div>
+</section>
+
+<!-- Add Prompt Modal -->
+<dialog id="add-prompt-modal" class="rounded-xl shadow-2xl p-0 w-full max-w-5xl backdrop:bg-black/40">
+  <form id="add-prompt-form" method="POST" action="/projects/{{ project.id }}/prompts"
+        onsubmit="return buildYamlAndSubmit()">
+    <input type="hidden" name="yaml_content" id="f-yaml-hidden" />
+    <input type="hidden" name="bump_level" id="f-bump-hidden" value="patch" />
+
+    <div class="flex h-[90vh] max-h-[700px]">
+
+      <!-- Left: form fields -->
+      <div class="flex-1 overflow-y-auto p-6 border-r border-gray-100">
+        <h2 class="text-lg font-bold mb-5">Add Prompt</h2>
+
+        <!-- Bump level -->
+        <div class="mb-5">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bump level</label>
+          <div class="flex gap-3">
+            {% for level in ["patch", "minor", "major"] %}
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="radio" name="_bump_level" value="{{ level }}"
+                     {% if level == "patch" %}checked{% endif %}
+                     onchange="document.getElementById('f-bump-hidden').value=this.value; updatePreview()"
+                     class="accent-green-600" />
+              {{ level }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <hr class="border-gray-100 mb-5" />
+
+        <!-- Required fields -->
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Required</p>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            ID <span class="text-red-500">*</span>
+          </label>
+          <input id="f-id" type="text" oninput="updatePreview()" required
+                 placeholder="intent_classifier"
+                 class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                        focus:outline-none focus:ring-2 focus:ring-green-500" />
+          <p class="text-xs text-gray-400 mt-1">공백과 / 사용 불가</p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Prompt <span class="text-red-500">*</span>
+          </label>
+          <textarea id="f-prompt" rows="5" oninput="updatePreview()" required
+                    placeholder="You are a helpful assistant. Classify the user's intent."
+                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                           focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"></textarea>
+        </div>
+
+        <hr class="border-gray-100 mb-5 mt-6" />
+
+        <!-- LLM -->
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">LLM <span class="text-red-500">*</span></p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+            <select id="f-provider" onchange="updatePreview()"
+                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-green-500">
+              <option value="openai">openai</option>
+              <option value="anthropic">anthropic</option>
+              <option value="azure">azure</option>
+              <option value="custom">custom</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
+            <input id="f-model" type="text" oninput="updatePreview()" required
+                   placeholder="gpt-4.1"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Temperature <span class="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input id="f-temperature" type="number" step="0.01" min="0" max="2"
+                   oninput="updatePreview()" placeholder="0.2"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Max tokens <span class="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input id="f-max-tokens" type="number" min="1"
+                   oninput="updatePreview()" placeholder="300"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+        </div>
+
+        <hr class="border-gray-100 mb-5 mt-6" />
+
+        <!-- Optional metadata -->
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Optional</p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input id="f-description" type="text" oninput="updatePreview()"
+                   placeholder="Classify user intent"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+            <input id="f-author" type="text" oninput="updatePreview()"
+                   placeholder="alice"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+        </div>
+
+        <!-- Input variables -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Input variables</label>
+          <div id="f-vars-list" class="space-y-2 mb-2"></div>
+          <button type="button" onclick="addVar()"
+                  class="text-xs text-green-600 hover:text-green-800 font-medium">
+            + Add variable
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Right: YAML preview -->
+      <div class="w-72 flex-shrink-0 flex flex-col bg-gray-950">
+        <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Preview</span>
+          <span class="text-xs text-gray-600">YAML</span>
+        </div>
+        <pre id="yaml-preview"
+             class="flex-1 overflow-auto p-4 text-xs text-green-300 font-mono leading-relaxed whitespace-pre"></pre>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="flex gap-3 justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+      <button type="button" onclick="document.getElementById('add-prompt-modal').close()"
+              class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition">Cancel</button>
+      <button type="submit"
+              class="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+        Add Prompt
+      </button>
+    </div>
+
+  </form>
+</dialog>
+
+<script>
+function buildYaml() {
+  const id          = (document.getElementById('f-id').value || '').trim();
+  const prompt      = (document.getElementById('f-prompt').value || '').trim();
+  const provider    = document.getElementById('f-provider').value;
+  const model       = (document.getElementById('f-model').value || '').trim();
+  const temperature = document.getElementById('f-temperature').value.trim();
+  const maxTokens   = document.getElementById('f-max-tokens').value.trim();
+  const description = (document.getElementById('f-description').value || '').trim();
+  const author      = (document.getElementById('f-author').value || '').trim();
+  const vars = [...document.querySelectorAll('.var-input')]
+    .map(i => i.value.trim()).filter(Boolean);
+
+  if (!id || !prompt || !model) return null;
+
+  let yaml = `id: "${id}"\n`;
+  if (description) yaml += `description: "${description}"\n`;
+  if (author)      yaml += `author: "${author}"\n`;
+  yaml += `\nllm:\n  provider: "${provider}"\n  model: "${model}"\n`;
+
+  const hasParams = temperature || maxTokens;
+  if (hasParams) {
+    yaml += `  params:\n`;
+    if (temperature) yaml += `    temperature: ${temperature}\n`;
+    if (maxTokens)   yaml += `    max_tokens: ${maxTokens}\n`;
+  }
+
+  yaml += `\nprompt: |\n`;
+  prompt.split('\n').forEach(line => { yaml += `  ${line}\n`; });
+
+  if (vars.length > 0) {
+    yaml += `\ninput_variables:\n`;
+    vars.forEach(v => { yaml += `  - ${v}\n`; });
+  }
+
+  return yaml;
+}
+
+function updatePreview() {
+  const yaml = buildYaml();
+  document.getElementById('yaml-preview').textContent = yaml || '# Fill in required fields…';
+}
+
+function buildYamlAndSubmit() {
+  const yaml = buildYaml();
+  if (!yaml) return false;
+  document.getElementById('f-yaml-hidden').value = yaml;
+  return true;
+}
+
+function addVar() {
+  const list = document.getElementById('f-vars-list');
+  const row = document.createElement('div');
+  row.className = 'flex gap-2';
+  row.innerHTML = `
+    <input type="text" class="var-input flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-green-500"
+           placeholder="variable_name" oninput="updatePreview()" />
+    <button type="button" onclick="this.parentElement.remove(); updatePreview()"
+            class="text-gray-400 hover:text-red-500 px-1 text-lg leading-none">×</button>`;
+  list.appendChild(row);
+}
+
+// init preview
+updatePreview();
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}pvm{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-900">
+
+  <nav class="bg-gray-900 text-white px-6 py-3 flex items-center gap-6 shadow">
+    <a href="/" class="text-lg font-bold text-green-400 tracking-tight">pvm</a>
+    <span class="text-gray-500 text-sm">prompt version manager</span>
+    <div class="ml-auto flex items-center gap-4 text-sm">
+      <a href="/" class="text-gray-400 hover:text-white transition">Projects</a>
+      <a href="/docs" target="_blank" class="text-gray-400 hover:text-white transition">API</a>
+    </div>
+  </nav>
+
+  {% block breadcrumb %}{% endblock %}
+
+  <main class="max-w-7xl mx-auto px-6 py-8 fade-in">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

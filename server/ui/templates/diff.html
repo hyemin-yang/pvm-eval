@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Diff {{ prompt_id }} — {{ project.name }} — pvm{% endblock %}
+
+{% block breadcrumb %}
+<div class="bg-white border-b border-gray-200 px-6 py-2 text-sm text-gray-500">
+  <div class="max-w-7xl mx-auto flex items-center gap-2">
+    <a href="/" class="hover:text-gray-900">Projects</a>
+    <span>/</span>
+    <a href="/projects/{{ project.id }}" class="hover:text-gray-900">{{ project.name }}</a>
+    <span>/</span>
+    <a href="/projects/{{ project.id }}/prompts/{{ prompt_id }}" class="hover:text-gray-900 font-mono">{{ prompt_id }}</a>
+    <span>/</span>
+    <span class="text-gray-900 font-medium">Diff</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold mb-1 font-mono">{{ prompt_id }} diff</h1>
+</div>
+
+<!-- Version selector -->
+<form method="GET" class="bg-white rounded-lg border border-gray-200 p-5 mb-6 flex items-end gap-4">
+  <div class="flex-1">
+    <label class="block text-sm font-medium text-gray-700 mb-1">From</label>
+    <select name="from_version"
+            class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                   focus:outline-none focus:ring-2 focus:ring-green-500">
+      <option value="">Select version</option>
+      {% for v in versions %}
+      <option value="{{ v }}" {% if v == from_version %}selected{% endif %}>{{ v }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="text-gray-400 pb-2">→</div>
+  <div class="flex-1">
+    <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
+    <select name="to_version"
+            class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                   focus:outline-none focus:ring-2 focus:ring-green-500">
+      <option value="">Select version</option>
+      {% for v in versions %}
+      <option value="{{ v }}" {% if v == to_version %}selected{% endif %}>{{ v }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit"
+          class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+    Compare
+  </button>
+</form>
+
+{% if error %}
+<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-5 py-4 text-sm mb-6">
+  {{ error }}
+</div>
+{% endif %}
+
+{% if diff %}
+<!-- Summary -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+    <p class="text-2xl font-bold text-green-600">+{{ diff.lines_added }}</p>
+    <p class="text-xs text-gray-500 mt-1">Lines added</p>
+  </div>
+  <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+    <p class="text-2xl font-bold text-red-500">-{{ diff.lines_removed }}</p>
+    <p class="text-xs text-gray-500 mt-1">Lines removed</p>
+  </div>
+  <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+    <p class="text-2xl font-bold text-gray-700">
+      {% if diff.prompt_length_delta > 0 %}+{% endif %}{{ diff.prompt_length_delta }}
+    </p>
+    <p class="text-xs text-gray-500 mt-1">Char delta</p>
+  </div>
+  <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+    <p class="text-2xl font-bold {% if diff.model_config_changed %}text-amber-500{% else %}text-gray-400{% endif %}">
+      {% if diff.model_config_changed %}Changed{% else %}Same{% endif %}
+    </p>
+    <p class="text-xs text-gray-500 mt-1">Model config</p>
+  </div>
+</div>
+
+<!-- Diff output -->
+<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+    <span class="text-sm font-medium text-gray-700">Prompt diff</span>
+    <span class="font-mono text-xs text-gray-400">{{ from_version }} → {{ to_version }}</span>
+  </div>
+  <div class="code-block overflow-x-auto">
+    {% if diff.unified_diff and diff.unified_diff != "(no changes)" %}
+      {% for line in diff.unified_diff.splitlines() %}
+        {% if line.startswith("+++") or line.startswith("---") %}
+          <div class="diff-line diff-meta">{{ line }}</div>
+        {% elif line.startswith("@@") %}
+          <div class="diff-line diff-meta">{{ line }}</div>
+        {% elif line.startswith("+") %}
+          <div class="diff-line diff-add">{{ line }}</div>
+        {% elif line.startswith("-") %}
+          <div class="diff-line diff-del">{{ line }}</div>
+        {% else %}
+          <div class="diff-line diff-ctx">{{ line }}</div>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+    <div class="px-5 py-8 text-center text-sm text-gray-400">No prompt changes.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Model config diff -->
+{% if diff.model_config_changed and from_prompt and to_prompt %}
+<div class="mt-4 bg-white rounded-lg border border-amber-200 overflow-hidden">
+  <div class="px-5 py-3 border-b border-amber-100 bg-amber-50">
+    <span class="text-sm font-medium text-amber-800">Model config changed</span>
+  </div>
+  <div class="grid grid-cols-2 divide-x divide-gray-100">
+    <div class="p-5">
+      <p class="text-xs text-gray-500 mb-2 font-semibold">{{ from_version }}</p>
+      <pre class="prompt-body text-gray-700">{{ from_prompt.llm | tojson(indent=2) }}</pre>
+    </div>
+    <div class="p-5">
+      <p class="text-xs text-gray-500 mb-2 font-semibold">{{ to_version }}</p>
+      <pre class="prompt-body text-gray-700">{{ to_prompt.llm | tojson(indent=2) }}</pre>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% elif from_version and to_version %}
+<div class="text-center py-12 text-gray-400 text-sm">Select two versions to compare.</div>
+{% endif %}
+{% endblock %}

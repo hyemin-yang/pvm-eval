@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% block title %}{{ info.id }} — {{ project.name }} — pvm{% endblock %}
+
+{% block breadcrumb %}
+<div class="bg-white border-b border-gray-200 px-6 py-2 text-sm text-gray-500">
+  <div class="max-w-7xl mx-auto flex items-center gap-2">
+    <a href="/" class="hover:text-gray-900">Projects</a>
+    <span>/</span>
+    <a href="/projects/{{ project.id }}" class="hover:text-gray-900">{{ project.name }}</a>
+    <span>/</span>
+    <span class="text-gray-900 font-medium font-mono">{{ info.id }}</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flex gap-8">
+
+  <!-- Sidebar: version timeline -->
+  <aside class="w-48 flex-shrink-0">
+    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Versions</h3>
+    <div class="space-y-1">
+      {% for v in versions | reverse %}
+      <a href="/projects/{{ project.id }}/prompts/{{ info.id }}?version={{ v }}"
+         class="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-mono transition
+                {% if v == current_version %}bg-gray-900 text-white font-semibold
+                {% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+        {{ v }}
+        {% if v == production_version %}
+        <span class="text-xs px-1.5 py-0.5 rounded font-sans font-medium
+                     {% if v == current_version %}bg-green-500 text-white{% else %}bg-green-100 text-green-700{% endif %}">
+          prod
+        </span>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="mt-6 space-y-2">
+      <a href="/projects/{{ project.id }}/prompts/{{ info.id }}/diff"
+         class="block text-center text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition">
+        Diff
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <div class="flex-1 min-w-0">
+
+    <!-- Header -->
+    <div class="flex items-start justify-between mb-6">
+      <div>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold font-mono">{{ info.id }}</h1>
+          {% if production_version %}
+          <span class="badge-prod text-xs px-2 py-0.5 rounded-full font-mono">
+            prod: {{ production_version }}
+          </span>
+          {% endif %}
+        </div>
+        {% if info.description %}
+        <p class="text-gray-500 mt-1 text-sm">{{ info.description }}</p>
+        {% endif %}
+        {% if info.author %}
+        <p class="text-xs text-gray-400 mt-0.5">by {{ info.author }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-2 flex-shrink-0">
+        <form method="POST" action="/projects/{{ project.id }}/prompts/{{ info.id }}/rollback"
+              onsubmit="return confirm('Rollback to previous version?')">
+          <button type="submit"
+                  class="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition">
+            ↩ Rollback
+          </button>
+        </form>
+        <button onclick="document.getElementById('deploy-modal').showModal()"
+                class="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition">
+          🚀 Deploy
+        </button>
+        <button onclick="document.getElementById('new-version-modal').showModal()"
+                class="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+          + New Version
+        </button>
+      </div>
+    </div>
+
+    <!-- Current version content -->
+    {% if current_prompt %}
+    <div class="bg-white rounded-lg border border-gray-200 mb-6">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-gray-700">Prompt</span>
+          <span class="font-mono text-xs badge-ver px-2 py-0.5 rounded-full">{{ current_version }}</span>
+          {% if current_version == production_version %}
+          <span class="badge-prod text-xs px-2 py-0.5 rounded-full">production</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="p-5 code-block">
+        <pre class="prompt-body text-gray-800">{{ current_prompt.prompt }}</pre>
+      </div>
+    </div>
+
+    <!-- Model config -->
+    <div class="bg-white rounded-lg border border-gray-200 mb-6">
+      <div class="px-5 py-3 border-b border-gray-100">
+        <span class="text-sm font-medium text-gray-700">Model Config</span>
+      </div>
+      <div class="p-5 code-block">
+        <pre class="prompt-body text-gray-600">{{ current_prompt.llm | tojson(indent=2) }}</pre>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- History log -->
+    <details class="bg-white rounded-lg border border-gray-200">
+      <summary class="px-5 py-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
+        History ({{ log | length }} events)
+      </summary>
+      <div class="border-t border-gray-100 divide-y divide-gray-50">
+        {% for entry in log | reverse %}
+        <div class="px-5 py-3 text-xs font-mono flex items-start gap-4">
+          <span class="text-gray-400 flex-shrink-0">{{ entry.ts }}</span>
+          <span class="
+            {% if entry.event == 'deploy' %}text-green-700 font-semibold
+            {% elif entry.event == 'rollback' %}text-amber-700 font-semibold
+            {% else %}text-blue-700 font-semibold{% endif %}">
+            {{ entry.event }}
+          </span>
+          <span class="text-gray-600">
+            {% if entry.version %}v{{ entry.version }}{% endif %}
+            {% if entry.from_version and entry.to_version %}
+              {{ entry.from_version or "none" }} → {{ entry.to_version }}
+            {% endif %}
+          </span>
+        </div>
+        {% else %}
+        <div class="px-5 py-4 text-xs text-gray-400">No history.</div>
+        {% endfor %}
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<!-- New Version modal -->
+<dialog id="new-version-modal" class="rounded-xl shadow-2xl p-0 w-full max-w-5xl backdrop:bg-black/40">
+  <form id="new-version-form" method="POST" action="/projects/{{ project.id }}/prompts"
+        onsubmit="return buildNewVersionYaml()">
+    <input type="hidden" name="yaml_content" id="nv-yaml-hidden" />
+    <input type="hidden" name="bump_level"   id="nv-bump-hidden" value="patch" />
+
+    <div class="flex h-[90vh] max-h-[700px]">
+
+      <!-- Left: fields -->
+      <div class="flex-1 overflow-y-auto p-6 border-r border-gray-100">
+        <h2 class="text-lg font-bold mb-1">New Version</h2>
+        <p class="text-sm text-gray-500 mb-5">
+          <span class="font-mono text-gray-700">{{ info.id }}</span>의 새 버전을 작성합니다.
+          현재 버전 <span class="font-mono badge-ver px-1.5 py-0.5 rounded text-xs">{{ current_version }}</span>
+          내용이 미리 채워져 있습니다.
+        </p>
+
+        <!-- Bump level -->
+        <div class="mb-5">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bump level</label>
+          <div class="flex gap-3">
+            {% for level in ["patch", "minor", "major"] %}
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="radio" name="_nv_bump" value="{{ level }}"
+                     {% if level == "patch" %}checked{% endif %}
+                     onchange="document.getElementById('nv-bump-hidden').value=this.value; nvUpdatePreview()"
+                     class="accent-green-600" />
+              {{ level }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <hr class="border-gray-100 mb-5" />
+
+        <!-- ID: locked -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">ID</label>
+          <input type="text" value="{{ info.id }}" disabled
+                 class="block w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono
+                        bg-gray-50 text-gray-400 cursor-not-allowed" />
+          <p class="text-xs text-gray-400 mt-1">버전만 추가합니다. ID 변경은 불가합니다.</p>
+        </div>
+
+        <!-- Prompt -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Prompt <span class="text-red-500">*</span>
+          </label>
+          <textarea id="nv-prompt" rows="6" oninput="nvUpdatePreview()" required
+                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                           focus:outline-none focus:ring-2 focus:ring-green-500 resize-y">{{ current_prompt.prompt if current_prompt else "" }}</textarea>
+        </div>
+
+        <hr class="border-gray-100 mb-5 mt-6" />
+
+        <!-- LLM -->
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">LLM <span class="text-red-500">*</span></p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+            <select id="nv-provider" onchange="nvUpdatePreview()"
+                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-green-500">
+              {% for p in ["openai", "anthropic", "azure", "custom"] %}
+              <option value="{{ p }}"
+                {% if current_prompt and current_prompt.llm.provider == p %}selected{% endif %}>
+                {{ p }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
+            <input id="nv-model" type="text" oninput="nvUpdatePreview()" required
+                   value="{{ current_prompt.llm.model if current_prompt else '' }}"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Temperature <span class="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input id="nv-temperature" type="number" step="0.01" min="0" max="2"
+                   oninput="nvUpdatePreview()"
+                   value="{{ current_prompt.llm.params.temperature if current_prompt and current_prompt.llm.params is defined and current_prompt.llm.params.temperature is defined else '' }}"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Max tokens <span class="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input id="nv-max-tokens" type="number" min="1"
+                   oninput="nvUpdatePreview()"
+                   value="{{ current_prompt.llm.params.max_tokens if current_prompt and current_prompt.llm.params is defined and current_prompt.llm.params.max_tokens is defined else '' }}"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+        </div>
+
+        <hr class="border-gray-100 mb-5 mt-6" />
+
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Optional</p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input id="nv-description" type="text" oninput="nvUpdatePreview()"
+                   value="{{ current_prompt.metadata.description if current_prompt and current_prompt.metadata.description else '' }}"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+            <input id="nv-author" type="text" oninput="nvUpdatePreview()"
+                   value="{{ current_prompt.metadata.author if current_prompt and current_prompt.metadata.author else '' }}"
+                   class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+        </div>
+
+        <!-- Input variables -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Input variables</label>
+          <div id="nv-vars-list" class="space-y-2 mb-2"></div>
+          <button type="button" onclick="nvAddVar()"
+                  class="text-xs text-green-600 hover:text-green-800 font-medium">
+            + Add variable
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Right: YAML preview -->
+      <div class="w-72 flex-shrink-0 flex flex-col bg-gray-950">
+        <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Preview</span>
+          <span class="text-xs text-gray-600">YAML</span>
+        </div>
+        <pre id="nv-yaml-preview"
+             class="flex-1 overflow-auto p-4 text-xs text-green-300 font-mono leading-relaxed whitespace-pre"></pre>
+      </div>
+
+    </div>
+
+    <div class="flex gap-3 justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+      <button type="button" onclick="document.getElementById('new-version-modal').close()"
+              class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition">Cancel</button>
+      <button type="submit"
+              class="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+        Add Version
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const NV_ID = "{{ info.id }}";
+
+function nvBuildYaml() {
+  const prompt      = (document.getElementById('nv-prompt').value || '').trim();
+  const provider    = document.getElementById('nv-provider').value;
+  const model       = (document.getElementById('nv-model').value || '').trim();
+  const temperature = document.getElementById('nv-temperature').value.trim();
+  const maxTokens   = document.getElementById('nv-max-tokens').value.trim();
+  const description = (document.getElementById('nv-description').value || '').trim();
+  const author      = (document.getElementById('nv-author').value || '').trim();
+  const vars = [...document.querySelectorAll('#nv-vars-list .nv-var-input')]
+    .map(i => i.value.trim()).filter(Boolean);
+
+  if (!prompt || !model) return null;
+
+  let yaml = `id: "${NV_ID}"\n`;
+  if (description) yaml += `description: "${description}"\n`;
+  if (author)      yaml += `author: "${author}"\n`;
+  yaml += `\nllm:\n  provider: "${provider}"\n  model: "${model}"\n`;
+  if (temperature || maxTokens) {
+    yaml += `  params:\n`;
+    if (temperature) yaml += `    temperature: ${temperature}\n`;
+    if (maxTokens)   yaml += `    max_tokens: ${maxTokens}\n`;
+  }
+  yaml += `\nprompt: |\n`;
+  prompt.split('\n').forEach(line => { yaml += `  ${line}\n`; });
+  if (vars.length > 0) {
+    yaml += `\ninput_variables:\n`;
+    vars.forEach(v => { yaml += `  - ${v}\n`; });
+  }
+  return yaml;
+}
+
+function nvUpdatePreview() {
+  const yaml = nvBuildYaml();
+  document.getElementById('nv-yaml-preview').textContent = yaml || '# Fill in required fields…';
+}
+
+function buildNewVersionYaml() {
+  const yaml = nvBuildYaml();
+  if (!yaml) return false;
+  document.getElementById('nv-yaml-hidden').value = yaml;
+  return true;
+}
+
+function nvAddVar() {
+  const list = document.getElementById('nv-vars-list');
+  const row = document.createElement('div');
+  row.className = 'flex gap-2';
+  row.innerHTML = `
+    <input type="text" class="nv-var-input flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-green-500"
+           placeholder="variable_name" oninput="nvUpdatePreview()" />
+    <button type="button" onclick="this.parentElement.remove(); nvUpdatePreview()"
+            class="text-gray-400 hover:text-red-500 px-1 text-lg leading-none">×</button>`;
+  list.appendChild(row);
+}
+
+nvUpdatePreview();
+</script>
+
+<!-- Deploy modal -->
+<dialog id="deploy-modal" class="rounded-xl shadow-2xl p-0 w-full max-w-sm backdrop:bg-black/40">
+  <form method="POST" action="/projects/{{ project.id }}/prompts/{{ info.id }}/deploy" class="p-6">
+    <h2 class="text-lg font-bold mb-4">Deploy</h2>
+    <label class="block mb-5">
+      <span class="text-sm font-medium text-gray-700">Version</span>
+      <select name="version"
+              class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-green-500">
+        <option value="">Latest</option>
+        {% for v in versions | reverse %}
+        <option value="{{ v }}" {% if v == current_version %}selected{% endif %}>
+          {{ v }}{% if v == production_version %} (current prod){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="flex gap-3 justify-end">
+      <button type="button" onclick="document.getElementById('deploy-modal').close()"
+              class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition">Cancel</button>
+      <button type="submit"
+              class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+        Deploy
+      </button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

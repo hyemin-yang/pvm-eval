@@ -1,0 +1,20 @@
+/* Diff viewer */
+.diff-line { font-family: 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 0.8rem; padding: 1px 8px; white-space: pre; }
+.diff-add  { background: #d1fae5; color: #065f46; }
+.diff-del  { background: #fee2e2; color: #991b1b; }
+.diff-meta { background: #e0e7ff; color: #3730a3; }
+.diff-ctx  { background: #f9fafb; color: #374151; }
+
+/* Version badge */
+.badge-prod { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.badge-ver  { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+
+/* Prompt content */
+.prompt-body { font-family: 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+/* Scrollable code blocks */
+.code-block { max-height: 400px; overflow-y: auto; }
+
+/* Fade-in animation */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.15s ease-out; }

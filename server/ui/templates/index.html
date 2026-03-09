@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Projects — pvm{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-2xl font-bold">Projects</h1>
+    <p class="text-sm text-gray-500 mt-1">{{ projects | length }} project{% if projects | length != 1 %}s{% endif %}</p>
+  </div>
+  <button onclick="document.getElementById('create-modal').showModal()"
+          class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+    + New Project
+  </button>
+</div>
+
+{% if projects %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for p in projects %}
+  <a href="/projects/{{ p.id }}"
+     class="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md hover:border-green-300 transition block">
+    <div class="flex items-start justify-between">
+      <h2 class="font-semibold text-gray-900">{{ p.name }}</h2>
+      <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+        {{ p.prompt_count }} prompt{% if p.prompt_count != 1 %}s{% endif %}
+      </span>
+    </div>
+    <p class="text-xs text-gray-400 mt-3 font-mono">{{ p.id }}</p>
+    <p class="text-xs text-gray-400 mt-1">{{ p.created_at }}</p>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-20 text-gray-400">
+  <p class="text-4xl mb-4">📂</p>
+  <p class="text-lg font-medium">No projects yet</p>
+  <p class="text-sm mt-1">Create a project to start managing your prompts.</p>
+</div>
+{% endif %}
+
+<!-- Create project modal -->
+<dialog id="create-modal" class="rounded-xl shadow-2xl p-0 w-full max-w-sm backdrop:bg-black/40">
+  <form method="POST" action="/projects" class="p-6">
+    <h2 class="text-lg font-bold mb-4">New Project</h2>
+    <label class="block mb-5">
+      <span class="text-sm font-medium text-gray-700">Project name</span>
+      <input type="text" name="name" value="my-project" autofocus
+             class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+    </label>
+    <div class="flex gap-3 justify-end">
+      <button type="button" onclick="document.getElementById('create-modal').close()"
+              class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition">
+        Cancel
+      </button>
+      <button type="submit"
+              class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+        Create
+      </button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
