@@ -32,3 +32,9 @@ pvm-server = "server.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pvm*", "server*"]
+
+[tool.setuptools.package-data]
+server = [
+  "ui/static/**/*",
+  "ui/templates/**/*",
+]

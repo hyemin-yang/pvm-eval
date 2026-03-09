@@ -40,6 +40,12 @@ Upgrade after changes:
 pipx reinstall pvm
 ```
 
+If you installed the server extra, reinstall with the same spec:
+
+```bash
+pipx reinstall "pvm[server] @ git+https://github.com/OWNER/REPO.git@main"
+```
+
 If you publish version bumps, `pipx upgrade pvm` works as well.
 
 ### Local development with Poetry
