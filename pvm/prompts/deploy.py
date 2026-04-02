@@ -51,11 +51,17 @@ def deploy_prompt(root: Path, prompt_id: str, version: str | None = None) -> dic
 
     updated_at = utc_now_iso()
 
+    previous_versions: list[str] = []
+    if current:
+        previous_versions = current.get("previous_versions", [])
+        previous_versions = [*previous_versions, current["version"]]
+
     dump_json(
         production_file,
         {
             "id": prompt_id,
             "version": target_version,
+            "previous_versions": previous_versions,
             "updated_at": updated_at,
         },
     )
