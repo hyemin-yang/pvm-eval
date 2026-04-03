@@ -8,6 +8,7 @@ from pvm.core.paths import ProjectPaths
 from pvm.prompts.common import list_prompt_versions, read_prompt_metadata
 from pvm.prompts.list_ids import list_prompt_ids
 from pvm.snapshots.common import get_next_snapshot_version
+from pvm.storage.checksum import sha256_data
 from pvm.storage.history import append_history
 from pvm.storage.json_io import dump_json, load_json
 from pvm.storage.time import utc_now_iso
@@ -47,9 +48,12 @@ def create_snapshot(root: Path, bump_level: str = "patch") -> dict[str, Any]:
             "model_config_checksum": metadata["model_config_checksum"],
         }
 
+    snapshot_checksum = sha256_data(prompts)
+
     manifest = {
         "version": version,
         "created_at": created_at,
+        "snapshot_checksum": snapshot_checksum,
         "prompt_count": len(prompts),
         "prompts": prompts,
     }

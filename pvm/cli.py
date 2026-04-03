@@ -277,6 +277,15 @@ def snapshot_read(version: str) -> None:
     _print_json(_project().read_snapshot(version))
 
 
+@snapshot_app.command("export")
+def snapshot_export(
+    version: str = typer.Argument(...),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output zip file path"),
+) -> None:
+    """Export a snapshot as a zip file."""
+    _print_json(_project().export_snapshot(version, output))
+
+
 @snapshot_app.command("diff")
 def snapshot_diff(from_version: str, to_version: str) -> None:
     """Diff two snapshots."""

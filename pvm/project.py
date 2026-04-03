@@ -21,6 +21,7 @@ from pvm.prompts.list_ids import list_prompt_ids, list_prompt_versions_for_id
 from pvm.prompts.rollback import rollback_prompt
 from pvm.snapshots.create import create_snapshot
 from pvm.snapshots.diff import diff_snapshots
+from pvm.snapshots.export import export_snapshot
 from pvm.snapshots.get import get_snapshot
 from pvm.snapshots.list import list_snapshots
 from pvm.snapshots.read import read_snapshot
@@ -171,6 +172,11 @@ class PVMProject:
         """Expand a snapshot into the prompt contents it references."""
         self.require_valid()
         return read_snapshot(self.root, version)
+
+    def export_snapshot(self, version: str, output_path: str | Path | None = None) -> dict[str, Any]:
+        """Export a snapshot version as a zip file."""
+        self.require_valid()
+        return export_snapshot(self.root, version, output_path)
 
     def diff_snapshot(self, from_version: str, to_version: str) -> dict[str, Any]:
         """Compare two snapshots by prompt membership and version mapping."""
