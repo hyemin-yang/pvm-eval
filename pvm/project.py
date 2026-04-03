@@ -25,8 +25,10 @@ from pvm.snapshots.read import read_snapshot
 class PVMProject:
     """Facade for project-scoped pvm operations."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path | str):
         """Bind the project facade to a filesystem root."""
+        root = Path(root)
+
         self.root = root.resolve()
         self.paths = ProjectPaths(self.root)
 
