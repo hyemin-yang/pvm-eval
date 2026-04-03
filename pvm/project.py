@@ -65,9 +65,18 @@ class PVMProject:
     def require_valid(self) -> None:
         """Raise if the current root is not an initialized pvm project."""
         if not self.is_valid():
-            raise NotValidProjectError(
-                f"Current directory is not a valid pvm project: {self.root}"
-            )
+            if self.paths.project_dir.exists():
+                msg = (
+                    f"Project is corrupted: {self.root}\n"
+                    "Run integrity check to inspect missing items, "
+                    "or reset the project to re-initialize."
+                )
+            else:
+                msg = (
+                    f"No pvm project found: {self.root}\n"
+                    "Initialize a new project first."
+                )
+            raise NotValidProjectError(msg)
 
     def init(self, name: str = "my-project") -> dict[str, Any]:
         """Initialize a new project in the current root."""
