@@ -84,7 +84,6 @@ class PVMProject:
 
     def destroy(self) -> dict[str, Any]:
         """Remove the `.pvm/` directory tree entirely."""
-        self.require_valid()
         return destroy_project(self.root)
 
     def reset(self) -> dict[str, Any]:

@@ -78,11 +78,15 @@ def destroy(
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ) -> None:
     """Remove the .pvm/ directory tree entirely."""
+    project = _project()
+    if not project.paths.project_dir.exists():
+        print("No pvm project found")
+        return
     if not force:
         confirm = typer.confirm("This will permanently delete the .pvm/ project. Continue?")
         if not confirm:
             raise SystemExit(0)
-    _print_json(_project().destroy())
+    _print_json(project.destroy())
 
 
 @app.command("reset")
