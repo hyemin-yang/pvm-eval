@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}pvm - Snapshot {{ manifest.version }}{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold font-mono">Snapshot {{ manifest.version }}</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ manifest.created_at }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/snapshots/{{ manifest.version }}/export"
+         class="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">Export ZIP</a>
+      <a href="/snapshots" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; Back</a>
+    </div>
+  </div>
+
+  <!-- Manifest Info -->
+  <div class="bg-white rounded-lg shadow p-6">
+    <div class="grid grid-cols-3 gap-4 text-sm">
+      <div>
+        <span class="text-gray-500">Prompts</span>
+        <p class="mt-1 text-lg font-bold">{{ manifest.prompt_count }}</p>
+      </div>
+      <div>
+        <span class="text-gray-500">Checksum</span>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="font-mono text-xs" title="{{ manifest.snapshot_checksum }}">{{ manifest.snapshot_checksum[:16] }}...</span>
+          <button onclick="copyText('{{ manifest.snapshot_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">Copy</button>
+        </div>
+      </div>
+      <div>
+        <span class="text-gray-500">Created</span>
+        <p class="mt-1">{{ manifest.created_at }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompts in Snapshot -->
+  <h2 class="text-lg font-semibold">Included Prompts</h2>
+
+  {% for prompt_id, prompt in snapshot_data.prompts.items() %}
+  <div class="bg-white rounded-lg shadow p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="font-mono text-green-600 font-semibold">{{ prompt_id }}</h3>
+      <span class="font-mono text-sm text-gray-500">v{{ prompt.version }}</span>
+    </div>
+
+    <!-- Prompt Text -->
+    <div>
+      <h4 class="text-xs font-semibold text-gray-400 mb-2">PROMPT</h4>
+      <pre class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">{{ prompt.prompt }}</pre>
+    </div>
+
+    <!-- LLM Config -->
+    <div>
+      <h4 class="text-xs font-semibold text-gray-400 mb-2">LLM CONFIG</h4>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        {% for key, value in prompt.llm.items() %}
+        <div>
+          <span class="text-gray-500">{{ key }}</span>
+          {% if value is mapping %}
+          <pre class="mt-1 text-gray-900 font-mono text-xs bg-gray-50 rounded p-2">{{ value | tojson(indent=2) }}</pre>
+          {% else %}
+          <p class="mt-1 font-mono">{{ value }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

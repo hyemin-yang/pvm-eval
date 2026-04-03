@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}pvm - Snapshot Diff{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Snapshot Diff</h1>
+      <p class="text-sm text-gray-500 mt-1">
+        <span class="font-mono font-medium">{{ diff_result.from_version }}</span>
+        &rarr; <span class="font-mono font-medium">{{ diff_result.to_version }}</span>
+      </p>
+    </div>
+    <a href="/snapshots" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; Back</a>
+  </div>
+
+  <!-- Summary -->
+  <div class="grid grid-cols-3 gap-4">
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+      <span class="text-3xl font-bold text-green-600">{{ diff_result.added_ids | length }}</span>
+      <p class="text-sm text-gray-500 mt-1">Added</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+      <span class="text-3xl font-bold text-red-600">{{ diff_result.removed_ids | length }}</span>
+      <p class="text-sm text-gray-500 mt-1">Removed</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+      <span class="text-3xl font-bold text-yellow-600">{{ diff_result.changed_ids | length }}</span>
+      <p class="text-sm text-gray-500 mt-1">Changed</p>
+    </div>
+  </div>
+
+  <!-- Added -->
+  {% if diff_result.added_ids %}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-sm font-semibold text-green-600 mb-3">ADDED</h2>
+    <ul class="space-y-2">
+      {% for id in diff_result.added_ids %}
+      <li class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-green-400"></span>
+        <span class="font-mono">{{ id }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Removed -->
+  {% if diff_result.removed_ids %}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-sm font-semibold text-red-600 mb-3">REMOVED</h2>
+    <ul class="space-y-2">
+      {% for id in diff_result.removed_ids %}
+      <li class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full bg-red-400"></span>
+        <span class="font-mono">{{ id }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Changed -->
+  {% if diff_result.changed_ids %}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-sm font-semibold text-yellow-600 mb-3">CHANGED</h2>
+    <ul class="space-y-2">
+      {% for item in diff_result.changed_ids %}
+      <li class="flex items-center justify-between text-sm">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+          <span class="font-mono">{{ item.id }}</span>
+        </div>
+        <span class="text-gray-500">
+          <span class="font-mono">{{ item.from_version }}</span> &rarr; <span class="font-mono">{{ item.to_version }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if not diff_result.added_ids and not diff_result.removed_ids and not diff_result.changed_ids %}
+  <div class="bg-white rounded-lg shadow p-12 text-center">
+    <p class="text-gray-400">No differences between these snapshots</p>
+  </div>
+  {% endif %}
+
+  <!-- Compare Other -->
+  {% if snapshots | length > 1 %}
+  <div class="bg-white rounded-lg shadow p-4">
+    <h2 class="text-sm font-semibold text-gray-500 mb-3">COMPARE OTHER VERSIONS</h2>
+    <form action="/snapshots/diff/compare" method="get" class="flex items-center gap-4">
+      <select name="from" class="text-sm border rounded px-3 py-2">
+        {% for ver in snapshots %}
+        <option value="{{ ver }}" {% if ver == diff_result.from_version %}selected{% endif %}>{{ ver }}</option>
+        {% endfor %}
+      </select>
+      <span class="text-gray-400">&rarr;</span>
+      <select name="to" class="text-sm border rounded px-3 py-2">
+        {% for ver in snapshots %}
+        <option value="{{ ver }}" {% if ver == diff_result.to_version %}selected{% endif %}>{{ ver }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Compare</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

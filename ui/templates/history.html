@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}pvm - History{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <h1 class="text-2xl font-bold">History</h1>
+
+  <!-- Filter -->
+  <div class="bg-white rounded-lg shadow p-4">
+    <form method="get" action="/history" class="flex items-center gap-4">
+      <select name="id" class="text-sm border rounded px-3 py-2">
+        <option value="">All (Snapshot history)</option>
+        {% for pid in prompt_ids %}
+        <option value="{{ pid }}" {% if selected_id == pid %}selected{% endif %}>{{ pid }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">Filter</button>
+    </form>
+  </div>
+
+  <!-- Timeline -->
+  {% if history_entries %}
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b">
+        <tr>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Time</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Event</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">ID</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Details</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for entry in history_entries | reverse %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-3 text-gray-500 font-mono text-xs">{{ entry.ts }}</td>
+          <td class="px-6 py-3">
+            {% if entry.event == 'add' %}
+              <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-medium">add</span>
+            {% elif entry.event == 'deploy' %}
+              <span class="px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-medium">deploy</span>
+            {% elif entry.event == 'rollback' %}
+              <span class="px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 text-xs font-medium">rollback</span>
+            {% elif entry.event == 'create' %}
+              <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-medium">snapshot</span>
+            {% else %}
+              <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-medium">{{ entry.event }}</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-3 font-mono text-green-600">{{ entry.id or entry.version or '-' }}</td>
+          <td class="px-6 py-3 text-gray-600 text-xs">
+            {% if entry.event == 'add' %}
+              version {{ entry.version }}
+            {% elif entry.event == 'deploy' %}
+              {{ entry.from_version or 'none' }} &rarr; {{ entry.to_version }}
+            {% elif entry.event == 'rollback' %}
+              {{ entry.from_version }} &rarr; {{ entry.to_version }}
+            {% elif entry.event == 'create' %}
+              {{ entry.prompt_count }} prompts
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-lg shadow p-12 text-center">
+    <p class="text-gray-400">No history entries</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

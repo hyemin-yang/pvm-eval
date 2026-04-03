@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}pvm - {{ info.id }}{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold font-mono">{{ info.id }}</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ info.info.description or '' }}</p>
+    </div>
+    <div class="flex gap-2">
+      {% if info.production %}
+      <form method="post" action="/prompts/{{ info.id }}/rollback">
+        <button type="submit" class="px-3 py-1.5 text-sm bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100"
+                onclick="return confirm('Rollback to previous version?')">Rollback</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/prompts/{{ info.id }}/delete"
+            onsubmit="return confirm('Permanently delete this prompt?')">
+        <button type="submit" class="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-6">
+    <!-- Versions Sidebar -->
+    <div class="col-span-1 space-y-4">
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">VERSIONS</h2>
+        <ul class="space-y-1">
+          {% for ver in versions | reverse %}
+          <li>
+            <a href="/prompts/{{ info.id }}/version/{{ ver }}"
+               class="flex items-center justify-between px-3 py-2 rounded text-sm
+                      {% if ver == current_version %}bg-green-50 text-green-700 font-medium{% else %}hover:bg-gray-50 text-gray-700{% endif %}">
+              <span class="font-mono">{{ ver }}</span>
+              <div class="flex gap-1">
+                {% if info.production and ver == info.production.version %}
+                  <span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700 text-xs">prod</span>
+                {% endif %}
+                {% if ver == info.latest_version %}
+                  <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">latest</span>
+                {% endif %}
+              </div>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Deploy -->
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">DEPLOY</h2>
+        <form method="post" action="/prompts/{{ info.id }}/deploy" class="space-y-2">
+          <select name="version" class="w-full text-sm border rounded px-3 py-2">
+            {% for ver in versions | reverse %}
+            <option value="{{ ver }}" {% if ver == current_version %}selected{% endif %}>{{ ver }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="w-full px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">Deploy</button>
+        </form>
+      </div>
+
+      <!-- Diff -->
+      {% if versions | length > 1 %}
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">COMPARE</h2>
+        <form action="/prompts/{{ info.id }}/diff" method="get" class="space-y-2">
+          <select name="from" class="w-full text-sm border rounded px-3 py-2">
+            {% for ver in versions %}
+            <option value="{{ ver }}" {% if loop.index == versions|length - 1 %}selected{% endif %}>{{ ver }}</option>
+            {% endfor %}
+          </select>
+          <select name="to" class="w-full text-sm border rounded px-3 py-2">
+            {% for ver in versions %}
+            <option value="{{ ver }}" {% if loop.last %}selected{% endif %}>{{ ver }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="w-full px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Compare</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Prompt Content -->
+    <div class="col-span-2 space-y-4">
+      {% if prompt_data %}
+      <!-- Prompt Text -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-500">PROMPT <span class="font-mono text-green-600">v{{ prompt_data.version }}</span></h2>
+          <button onclick="copyText(document.getElementById('prompt-text').textContent, this)" class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded bg-green-50 hover:bg-green-100">Copy</button>
+        </div>
+        <pre id="prompt-text" class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">{{ prompt_data.prompt }}</pre>
+      </div>
+
+      <!-- LLM Config -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">LLM CONFIG</h2>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          {% for key, value in prompt_data.llm.items() %}
+          <div>
+            <span class="text-gray-500">{{ key }}</span>
+            {% if value is mapping %}
+            <pre class="mt-1 text-gray-900 font-mono text-xs bg-gray-50 rounded p-2">{{ value | tojson(indent=2) }}</pre>
+            {% else %}
+            <p class="mt-1 text-gray-900 font-mono">{{ value }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">METADATA</h2>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span class="text-gray-500">Author</span>
+            <p class="mt-1">{{ prompt_data.metadata.author or '-' }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500">Created</span>
+            <p class="mt-1">{{ prompt_data.metadata.created_at }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500">Source File</span>
+            <p class="mt-1 font-mono text-xs">{{ prompt_data.metadata.source_file }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500">Template Checksum</span>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="font-mono text-xs" title="{{ prompt_data.metadata.template_checksum }}">{{ prompt_data.metadata.template_checksum[:16] }}...</span>
+              <button onclick="copyText('{{ prompt_data.metadata.template_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
