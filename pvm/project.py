@@ -84,12 +84,12 @@ class PVMProject:
 
     def destroy(self) -> dict[str, Any]:
         """Remove the `.pvm/` directory tree entirely."""
+        self.require_valid()
         return destroy_project(self.root)
 
     def reset(self) -> dict[str, Any]:
         """Reset the project by destroying and re-initializing with the same name."""
-        if not self.paths.project_dir.exists():
-            return {"reset": False, "reason": "not_found"}
+        self.require_valid()
         return reset_project(self.root)
 
     def load_config(self) -> dict[str, Any]:
