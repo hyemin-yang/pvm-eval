@@ -5,6 +5,7 @@ from typing import Any
 
 from pvm.config.destroy_project import destroy_project
 from pvm.config.init_project import init_project
+from pvm.config.reset_project import reset_project
 from pvm.config.load_config import load_config
 from pvm.config.load_template import load_template
 from pvm.core.errors import NotValidProjectError
@@ -71,6 +72,11 @@ class PVMProject:
         """Remove the `.pvm/` directory tree entirely."""
         self.require_valid()
         return destroy_project(self.root)
+
+    def reset(self) -> dict[str, Any]:
+        """Reset the project by destroying and re-initializing with the same name."""
+        self.require_valid()
+        return reset_project(self.root)
 
     def load_config(self) -> dict[str, Any]:
         """Load `.pvm/config.yaml` for the current project."""

@@ -79,6 +79,18 @@ def destroy(
     _print_json(_project().destroy())
 
 
+@app.command("reset")
+def reset(
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+) -> None:
+    """Reset the .pvm/ project to a clean state (same project name, new project id)."""
+    if not force:
+        confirm = typer.confirm("This will delete all prompts and snapshots. Continue?")
+        if not confirm:
+            raise SystemExit(0)
+    _print_json(_project().reset())
+
+
 @app.command("add")
 def add(
     template: Path,
