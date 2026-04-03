@@ -67,6 +67,18 @@ def init(name: str = typer.Argument("my-project")) -> None:
     _print_json(_project().init(name))
 
 
+@app.command("destroy")
+def destroy(
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+) -> None:
+    """Remove the .pvm/ directory tree entirely."""
+    if not force:
+        confirm = typer.confirm("This will permanently delete the .pvm/ project. Continue?")
+        if not confirm:
+            raise SystemExit(0)
+    _print_json(_project().destroy())
+
+
 @app.command("add")
 def add(
     template: Path,

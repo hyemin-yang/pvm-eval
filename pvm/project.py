@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from pvm.config.destroy_project import destroy_project
 from pvm.config.init_project import init_project
 from pvm.config.load_config import load_config
 from pvm.config.load_template import load_template
@@ -65,6 +66,11 @@ class PVMProject:
     def init(self, name: str = "my-project") -> dict[str, Any]:
         """Initialize a new project in the current root."""
         return init_project(self.root, name=name)
+
+    def destroy(self) -> dict[str, Any]:
+        """Remove the `.pvm/` directory tree entirely."""
+        self.require_valid()
+        return destroy_project(self.root)
 
     def load_config(self) -> dict[str, Any]:
         """Load `.pvm/config.yaml` for the current project."""
