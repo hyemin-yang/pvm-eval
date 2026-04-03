@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from pvm.config.check_integrity import check_integrity
 from pvm.config.destroy_project import destroy_project
 from pvm.config.init_project import init_project
 from pvm.config.reset_project import reset_project
@@ -56,6 +57,10 @@ class PVMProject:
         return all(path.exists() and path.is_dir() for path in required_dirs) and all(
             path.exists() and path.is_file() for path in required_files
         )
+
+    def check_integrity(self) -> dict[str, Any]:
+        """Check which required directories and files are missing from `.pvm/`."""
+        return check_integrity(self.root)
 
     def require_valid(self) -> None:
         """Raise if the current root is not an initialized pvm project."""

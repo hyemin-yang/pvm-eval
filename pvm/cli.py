@@ -61,6 +61,12 @@ def _project() -> PVMProject:
     return PVMProject.cwd()
 
 
+@app.command("check")
+def check() -> None:
+    """Check project integrity and report missing directories or files."""
+    _print_json(_project().check_integrity())
+
+
 @app.command("init")
 def init(name: str = typer.Argument("my-project")) -> None:
     """Initialize a pvm project."""
