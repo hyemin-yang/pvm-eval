@@ -137,6 +137,19 @@ def deploy(
     _print_json(result)
 
 
+@app.command("delete")
+def delete(
+    prompt_id: str = typer.Argument(..., metavar="ID"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+) -> None:
+    """Delete a prompt and all its versions entirely."""
+    if not force:
+        confirm = typer.confirm(f"This will permanently delete prompt '{prompt_id}'. Continue?")
+        if not confirm:
+            raise SystemExit(0)
+    _print_json(_project().delete_prompt(prompt_id))
+
+
 @app.command("rollback")
 def rollback(prompt_id: str = typer.Argument(..., metavar="ID")) -> None:
     """Rollback a prompt to the previous production version."""

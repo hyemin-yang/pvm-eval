@@ -12,6 +12,7 @@ from pvm.config.load_template import load_template
 from pvm.core.errors import NotValidProjectError
 from pvm.core.paths import ProjectPaths
 from pvm.prompts.add import add_prompt
+from pvm.prompts.delete import delete_prompt
 from pvm.prompts.deploy import deploy_prompt
 from pvm.prompts.diff import diff_prompt_versions
 from pvm.prompts.get import get_prompt
@@ -128,6 +129,11 @@ class PVMProject:
         """Read stable prompt metadata and version summary."""
         self.require_valid()
         return get_prompt_info(self.root, prompt_id)
+
+    def delete_prompt(self, prompt_id: str) -> dict[str, Any]:
+        """Delete a prompt and all its versions entirely."""
+        self.require_valid()
+        return delete_prompt(self.root, prompt_id)
 
     def deploy(self, prompt_id: str, version: str | None = None) -> dict[str, Any]:
         """Promote a prompt version to production, defaulting to the latest version."""
