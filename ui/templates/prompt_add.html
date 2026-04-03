@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}pvm - Add Prompt{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+  <h1 class="text-2xl font-bold">Add Prompt</h1>
+
+  {% if message %}
+  <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded text-sm">
+    {{ message }}
+  </div>
+  {% endif %}
+
+  <!-- Tab Switcher -->
+  <div class="flex border-b">
+    <button onclick="switchTab('form')" id="tab-form"
+            class="px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600">Form</button>
+    <button onclick="switchTab('upload')" id="tab-upload"
+            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">File Upload</button>
+    <button onclick="switchTab('editor')" id="tab-editor"
+            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">YAML Editor</button>
+  </div>
+
+  <!-- Form Input -->
+  <div id="panel-form" class="bg-white rounded-lg shadow p-6">
+    <form method="post" action="/prompts/add/form" class="space-y-6">
+      <!-- Required -->
+      <div>
+        <h3 class="text-sm font-bold text-red-500 mb-4 border-b border-red-200 pb-2">REQUIRED</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">ID</label>
+            <input type="text" name="prompt_id" required placeholder="intent_classifier"
+                   class="w-full text-sm font-mono border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Prompt</label>
+            <textarea name="prompt_text" rows="6" required placeholder="Classify the intent of the user input."
+                      class="w-full text-sm font-mono border rounded px-3 py-2"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">LLM Provider</label>
+              <input type="text" name="llm_provider" required placeholder="openai"
+                     class="w-full text-sm font-mono border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">LLM Model</label>
+              <input type="text" name="llm_model" required placeholder="gpt-4.1"
+                     class="w-full text-sm font-mono border rounded px-3 py-2">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional -->
+      <div>
+        <h3 class="text-sm font-bold text-gray-500 mb-4 border-b border-gray-200 pb-2">OPTIONAL</h3>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <input type="text" name="description" placeholder="Describe the role of this prompt"
+                     class="w-full text-sm border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+              <input type="text" name="author" placeholder="alice"
+                     class="w-full text-sm border rounded px-3 py-2">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Temperature</label>
+              <input type="number" name="temperature" step="0.01" min="0" max="2" placeholder="0.2"
+                     class="w-full text-sm font-mono border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Max Tokens</label>
+              <input type="number" name="max_tokens" step="1" min="1" placeholder="300"
+                     class="w-full text-sm font-mono border rounded px-3 py-2">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Extra Fields -->
+      <div>
+        <h3 class="text-sm font-bold text-blue-500 mb-4 border-b border-blue-200 pb-2">EXTRA FIELDS</h3>
+        <div id="extra-fields" class="space-y-2"></div>
+        <button type="button" onclick="addExtraField()"
+                class="mt-2 text-sm text-green-600 hover:underline">+ Add Field</button>
+      </div>
+
+      <!-- Bump Level -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Bump Level</label>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
+            <span class="text-sm">Patch</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="minor" class="text-green-600">
+            <span class="text-sm">Minor</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="major" class="text-green-600">
+            <span class="text-sm">Major</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+        Add Prompt
+      </button>
+    </form>
+  </div>
+
+  <!-- File Upload -->
+  <div id="panel-upload" class="bg-white rounded-lg shadow p-6 hidden">
+    <form method="post" action="/prompts/add" enctype="multipart/form-data" class="space-y-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">YAML Template File</label>
+        <input type="file" name="template_file" accept=".yaml,.yml" required
+               class="w-full text-sm border rounded px-3 py-2 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Bump Level</label>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
+            <span class="text-sm">Patch</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="minor" class="text-green-600">
+            <span class="text-sm">Minor</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="major" class="text-green-600">
+            <span class="text-sm">Major</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+        Add Prompt
+      </button>
+    </form>
+  </div>
+
+  <!-- YAML Editor -->
+  <div id="panel-editor" class="bg-white rounded-lg shadow p-6 hidden">
+    <form method="post" action="/prompts/add/editor" class="space-y-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">YAML Template</label>
+        <textarea name="yaml_content" rows="20" required
+                  class="w-full text-sm font-mono border rounded px-3 py-2 bg-gray-50 focus:bg-white">{{ yaml_content }}</textarea>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Bump Level</label>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
+            <span class="text-sm">Patch</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="minor" class="text-green-600">
+            <span class="text-sm">Minor</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="bump_level" value="major" class="text-green-600">
+            <span class="text-sm">Major</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+        Add Prompt
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function addExtraField() {
+  const container = document.getElementById('extra-fields');
+  const row = document.createElement('div');
+  row.className = 'flex gap-2 items-center';
+  row.innerHTML = `
+    <input type="text" name="extra_keys" placeholder="key" class="w-1/3 text-sm font-mono border rounded px-3 py-2">
+    <input type="text" name="extra_values" placeholder="value" class="flex-1 text-sm font-mono border rounded px-3 py-2">
+    <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-2">&times;</button>
+  `;
+  container.appendChild(row);
+}
+
+function switchTab(tab) {
+  const tabs = ['form', 'upload', 'editor'];
+  tabs.forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+    const tabBtn = document.getElementById('tab-' + t);
+    tabBtn.classList.toggle('border-green-600', t === tab);
+    tabBtn.classList.toggle('text-green-600', t === tab);
+    tabBtn.classList.toggle('border-transparent', t !== tab);
+    tabBtn.classList.toggle('text-gray-500', t !== tab);
+  });
+}
+</script>
+{% endblock %}

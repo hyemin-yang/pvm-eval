@@ -19,16 +19,26 @@ def create_snapshot(root: Path, bump_level: str = "patch") -> dict[str, Any]:
     paths = ProjectPaths(root.resolve())
     version = get_next_snapshot_version(paths, bump_level=bump_level)
     created_at = utc_now_iso()
+    # Check if any prompts are deployed
+    deployed_prompts = []
+    for prompt_id in list_prompt_ids(root):
+        production_file = paths.prompt_production_file(prompt_id)
+        if production_file.exists():
+            deployed_prompts.append(prompt_id)
+
+    if not deployed_prompts:
+        return {
+            "changed": False,
+            "reason": "no_deployed_prompts",
+        }
+
     prompts: dict[str, Any] = {}
 
     snapshot_prompts_dir = paths.snapshot_prompts_dir(version)
     snapshot_prompts_dir.mkdir(parents=True, exist_ok=True)
 
-    for prompt_id in list_prompt_ids(root):
-        production_file = paths.prompt_production_file(prompt_id)
-        if not production_file.exists():
-            continue
-        production = load_json(production_file)
+    for prompt_id in deployed_prompts:
+        production = load_json(paths.prompt_production_file(prompt_id))
         prompt_version = production["version"]
         metadata = read_prompt_metadata(paths, prompt_id, prompt_version)
 

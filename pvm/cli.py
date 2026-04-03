@@ -292,6 +292,15 @@ def snapshot_diff(from_version: str, to_version: str) -> None:
     _print_json(_project().diff_snapshot(from_version, to_version))
 
 
+@app.command("ui")
+def ui(
+    port: int = typer.Option(8001, "--port", "-p", help="Port number"),
+) -> None:
+    """Launch the local web UI."""
+    from ui.app import run
+    run(root=Path.cwd(), port=port)
+
+
 def main() -> None:
     """Execute the pvm CLI."""
     try:

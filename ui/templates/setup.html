@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}pvm - Setup{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-16 space-y-6">
+  <div class="text-center">
+    <h1 class="text-3xl font-bold text-green-400">pvm</h1>
+    <p class="text-gray-500 mt-2">prompt version manager</p>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-8 space-y-6">
+    <div>
+      <span class="text-sm text-gray-500">Path</span>
+      <p class="font-mono text-sm mt-1">{{ root_path }}</p>
+    </div>
+
+    {% if exists %}
+    <!-- .pvm exists but corrupted -->
+    <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded text-sm">
+      A .pvm directory exists but is corrupted. You can destroy it and start fresh.
+    </div>
+    <div class="flex gap-3">
+      <form method="post" action="/project/destroy" class="flex-1"
+            onsubmit="return confirm('This will permanently delete the corrupted .pvm directory. Continue?')">
+        <button type="submit" class="w-full px-4 py-2 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100">
+          Destroy
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <!-- No .pvm at all -->
+    <div class="bg-gray-50 border border-gray-200 text-gray-600 px-4 py-3 rounded text-sm">
+      No pvm project found at this path. Create one to get started.
+    </div>
+    <form method="post" action="/project/init" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+        <input type="text" name="name" value="my-project" required
+               class="w-full text-sm font-mono border rounded px-3 py-2">
+      </div>
+      <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+        Initialize Project
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

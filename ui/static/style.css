@@ -1,0 +1,27 @@
+/* diff2html overrides for better integration */
+.d2h-wrapper {
+  font-size: 13px;
+}
+
+.d2h-file-header {
+  display: none;
+}
+
+.d2h-code-line-ctn {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Version badge */
+.badge-prod { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.badge-ver  { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+
+/* Prompt content */
+.prompt-body { font-family: 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+/* Scrollable code blocks */
+.code-block { max-height: 400px; overflow-y: auto; }
+
+/* Fade-in animation */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.15s ease-out; }

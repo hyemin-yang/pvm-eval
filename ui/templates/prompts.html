@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}pvm - Prompts{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Prompts</h1>
+    <a href="/prompts/add" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">+ Add Prompt</a>
+  </div>
+
+  {% if prompts_summary %}
+  <!-- Search -->
+  <div class="bg-white rounded-lg shadow p-4 space-y-3">
+    <input type="text" id="prompt-search" placeholder="Search all..."
+           oninput="filterAll()"
+           class="w-full text-sm border rounded px-4 py-2">
+    <div class="flex items-center gap-2">
+      <button onclick="toggleAdvanced()" id="advanced-toggle"
+              class="text-xs text-green-600 hover:underline">Advanced Search</button>
+    </div>
+    <div id="advanced-panel" class="hidden grid grid-cols-3 gap-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">ID</label>
+        <input type="text" id="filter-id" oninput="filterAll()" placeholder="e.g. intent"
+               class="w-full text-xs font-mono border rounded px-3 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Author</label>
+        <input type="text" id="filter-author" oninput="filterAll()" placeholder="e.g. alice"
+               class="w-full text-xs border rounded px-3 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Status</label>
+        <select id="filter-status" onchange="filterAll()"
+                class="w-full text-xs border rounded px-3 py-1.5">
+          <option value="">All</option>
+          <option value="deployed">Deployed</option>
+          <option value="not-deployed">Not Deployed</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if prompts_summary %}
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b">
+        <tr>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">ID</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Author</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Versions</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Latest</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Production</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">Created</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for p in prompts_summary %}
+        <tr class="hover:bg-gray-50 cursor-pointer"
+            onclick="window.location='/prompts/{{ p.id }}'"
+            data-id="{{ p.id }}"
+            data-author="{{ p.info.author or '' }}"
+            data-status="{{ 'deployed' if p.production else 'not-deployed' }}">
+          <td class="px-6 py-4 font-mono text-green-600">{{ p.id }}</td>
+          <td class="px-6 py-4 text-gray-600">{{ p.info.author or '-' }}</td>
+          <td class="px-6 py-4">{{ p.versions | length }}</td>
+          <td class="px-6 py-4 font-mono">{{ p.latest_version }}</td>
+          <td class="px-6 py-4">
+            {% if p.production %}
+              <span class="px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-medium">v{{ p.production.version }}</span>
+            {% else %}
+              <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">-</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-gray-500">{{ p.info.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-lg shadow p-12 text-center">
+    <p class="text-gray-400 mb-4">No prompts yet</p>
+    <a href="/prompts/add" class="text-green-600 hover:underline">Add your first prompt</a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function toggleAdvanced() {
+  document.getElementById('advanced-panel').classList.toggle('hidden');
+}
+
+function filterAll() {
+  const globalQ = (document.getElementById('prompt-search').value || '').toLowerCase();
+  const idQ = (document.getElementById('filter-id')?.value || '').toLowerCase();
+  const authorQ = (document.getElementById('filter-author')?.value || '').toLowerCase();
+  const statusQ = (document.getElementById('filter-status')?.value || '');
+
+  document.querySelectorAll('tbody tr').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const id = (row.dataset.id || '').toLowerCase();
+    const author = (row.dataset.author || '').toLowerCase();
+    const status = row.dataset.status || '';
+
+    const matchGlobal = !globalQ || text.includes(globalQ);
+    const matchId = !idQ || id.includes(idQ);
+    const matchAuthor = !authorQ || author.includes(authorQ);
+    const matchStatus = !statusQ || status === statusQ;
+
+    row.style.display = (matchGlobal && matchId && matchAuthor && matchStatus) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
