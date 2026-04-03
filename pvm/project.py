@@ -88,7 +88,8 @@ class PVMProject:
 
     def reset(self) -> dict[str, Any]:
         """Reset the project by destroying and re-initializing with the same name."""
-        self.require_valid()
+        if not self.paths.project_dir.exists():
+            return {"reset": False, "reason": "not_found"}
         return reset_project(self.root)
 
     def load_config(self) -> dict[str, Any]:
