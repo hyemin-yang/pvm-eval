@@ -64,10 +64,10 @@
   </script>
   {% endif %}
 
-  <!-- Compare Other Versions -->
+  <!-- Diff Other Versions -->
   {% if versions | length > 1 %}
   <div class="bg-white rounded-lg shadow p-4">
-    <h2 class="text-sm font-semibold text-gray-500 mb-3">COMPARE OTHER VERSIONS</h2>
+    <h2 class="text-sm font-semibold text-gray-500 mb-3">DIFF OTHER VERSIONS</h2>
     <form action="/prompts/{{ prompt_id }}/diff" method="get" class="flex items-center gap-4">
       <select name="from" class="text-sm border rounded px-3 py-2">
         {% for ver in versions %}
@@ -80,7 +80,7 @@
         <option value="{{ ver }}" {% if ver == diff_result.to_version %}selected{% endif %}>{{ ver }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Compare</button>
+      <button type="submit" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Diff</button>
     </form>
   </div>
   {% endif %}
