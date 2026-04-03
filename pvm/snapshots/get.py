@@ -12,4 +12,4 @@ def get_snapshot(root: Path, version: str) -> dict[str, Any]:
     """Load a snapshot manifest by version."""
     paths = ProjectPaths(root.resolve())
     ensure_snapshot_exists(paths, version)
-    return load_json(paths.snapshot_versions_dir / f"{version}.json")
+    return load_json(paths.snapshot_manifest_file(version))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,9 @@ def create_snapshot(root: Path, bump_level: str = "patch") -> dict[str, Any]:
     created_at = utc_now_iso()
     prompts: dict[str, Any] = {}
 
+    snapshot_prompts_dir = paths.snapshot_prompts_dir(version)
+    snapshot_prompts_dir.mkdir(parents=True, exist_ok=True)
+
     for prompt_id in list_prompt_ids(root):
         production_file = paths.prompt_production_file(prompt_id)
         if not production_file.exists():
@@ -26,6 +30,17 @@ def create_snapshot(root: Path, bump_level: str = "patch") -> dict[str, Any]:
         production = load_json(production_file)
         prompt_version = production["version"]
         metadata = read_prompt_metadata(paths, prompt_id, prompt_version)
+
+        # Copy prompt files to snapshot
+        src_dir = paths.prompt_version_dir(prompt_id, prompt_version)
+        dst_dir = paths.snapshot_prompt_dir(version, prompt_id)
+        dst_dir.mkdir(parents=True, exist_ok=True)
+
+        for filename in ("prompt.md", "model_config.json", "metadata.json"):
+            src_file = src_dir / filename
+            if src_file.exists():
+                shutil.copy2(src_file, dst_dir / filename)
+
         prompts[prompt_id] = {
             "version": prompt_version,
             "prompt_checksum": metadata["prompt_checksum"],
@@ -38,7 +53,7 @@ def create_snapshot(root: Path, bump_level: str = "patch") -> dict[str, Any]:
         "prompt_count": len(prompts),
         "prompts": prompts,
     }
-    dump_json(paths.snapshot_versions_dir / f"{version}.json", manifest)
+    dump_json(paths.snapshot_manifest_file(version), manifest)
     append_history(
         paths.snapshot_history_file,
         {

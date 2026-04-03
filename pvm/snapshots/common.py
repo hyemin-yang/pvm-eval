@@ -15,9 +15,9 @@ def list_snapshot_versions(paths: ProjectPaths) -> list[str]:
     if not paths.snapshot_versions_dir.exists():
         return []
     versions = [
-        path.stem
+        path.name
         for path in paths.snapshot_versions_dir.iterdir()
-        if path.is_file() and path.suffix == ".json"
+        if path.is_dir()
     ]
     return sorted(versions, key=semver_sort_key)
 
@@ -38,6 +38,6 @@ def get_next_snapshot_version(paths: ProjectPaths, bump_level: str = "patch") ->
 def ensure_snapshot_exists(paths: ProjectPaths, version: str) -> None:
     """Raise if a snapshot version does not exist."""
     parse_semver(version)
-    snapshot_file = paths.snapshot_versions_dir / f"{version}.json"
-    if not snapshot_file.exists():
+    snapshot_dir = paths.snapshot_version_dir(version)
+    if not snapshot_dir.exists():
         raise VersionNotFoundError(f"Snapshot version not found: {version}")

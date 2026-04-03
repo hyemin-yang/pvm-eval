@@ -59,6 +59,18 @@ class ProjectPaths:
     def snapshot_versions_dir(self) -> Path:
         return self.snapshots_dir / "versions"
 
+    def snapshot_version_dir(self, version: str) -> Path:
+        return self.snapshot_versions_dir / version
+
+    def snapshot_manifest_file(self, version: str) -> Path:
+        return self.snapshot_version_dir(version) / "manifest.json"
+
+    def snapshot_prompts_dir(self, version: str) -> Path:
+        return self.snapshot_version_dir(version) / "prompts"
+
+    def snapshot_prompt_dir(self, version: str, prompt_id: str) -> Path:
+        return self.snapshot_prompts_dir(version) / prompt_id
+
     @property
     def snapshot_history_file(self) -> Path:
         return self.snapshots_dir / "history.jsonl"
