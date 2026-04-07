@@ -5,3 +5,8 @@
 build/
 dist/
 *.egg-info/
+
+custom_test.py
+
+
+vscode-extension/node_modules

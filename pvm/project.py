@@ -12,6 +12,7 @@ from pvm.config.load_template import load_template
 from pvm.core.errors import NotValidProjectError
 from pvm.core.paths import ProjectPaths
 from pvm.prompts.add import add_prompt
+from pvm.prompts.token_count import count_tokens as count_prompt_tokens, list_supported_models
 from pvm.prompts.delete import delete_prompt
 from pvm.prompts.deploy import deploy_prompt
 from pvm.prompts.diff import diff_prompt_versions
@@ -152,6 +153,15 @@ class PVMProject:
         """Compare two versions of the same prompt."""
         self.require_valid()
         return diff_prompt_versions(self.root, prompt_id, from_version, to_version)
+
+    def count_tokens(self, prompt_id: str, version: str, model: str) -> dict[str, Any]:
+        """Count tokens in a prompt version using the specified model's tokenizer."""
+        self.require_valid()
+        return count_prompt_tokens(self.root, prompt_id, version, model)
+
+    def list_token_models(self) -> list[str]:
+        """List models supported for token counting."""
+        return list_supported_models()
 
     def create_snapshot(self, bump_level: str = "patch") -> dict[str, Any]:
         """Create a snapshot from the current production prompt set."""

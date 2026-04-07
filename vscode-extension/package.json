@@ -1,0 +1,210 @@
+{
+  "name": "pvm",
+  "displayName": "PVM - Prompt Version Manager",
+  "description": "Manage prompt versions directly in VS Code",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.pvm",
+    "onView:pvmExplorer"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pvm",
+          "title": "PVM",
+          "icon": "media/pvm-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "pvm": [
+        {
+          "id": "pvmExplorer",
+          "name": "PVM Explorer"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "pvm.refresh",
+        "title": "Refresh",
+        "category": "PVM",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pvm.dashboard",
+        "title": "Dashboard",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.addPrompt",
+        "title": "Add Prompt",
+        "category": "PVM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "pvm.createSnapshot",
+        "title": "Create Snapshot",
+        "category": "PVM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "pvm.init",
+        "title": "Initialize Project",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.destroy",
+        "title": "Destroy Project",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.reset",
+        "title": "Reset Project",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.showHistory",
+        "title": "History",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.promptDetail",
+        "title": "View Prompt",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.promptUpdate",
+        "title": "Update Prompt",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.promptDiff",
+        "title": "Diff Prompt Versions",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.promptDeploy",
+        "title": "Deploy",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.promptRollback",
+        "title": "Rollback",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.promptDelete",
+        "title": "Delete Prompt",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.snapshotDetail",
+        "title": "View Snapshot",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.snapshotExport",
+        "title": "Export Snapshot",
+        "category": "PVM"
+      },
+      {
+        "command": "pvm.snapshotDiff",
+        "title": "Diff Snapshots",
+        "category": "PVM"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "pvm.refresh",
+          "when": "view == pvmExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "pvm.addPrompt",
+          "when": "viewItem == promptsHeader",
+          "group": "inline"
+        },
+        {
+          "command": "pvm.createSnapshot",
+          "when": "viewItem == snapshotsHeader",
+          "group": "inline"
+        },
+        {
+          "command": "pvm.promptDeploy",
+          "when": "viewItem == promptId",
+          "group": "1_actions"
+        },
+        {
+          "command": "pvm.promptRollback",
+          "when": "viewItem == promptId",
+          "group": "1_actions"
+        },
+        {
+          "command": "pvm.promptUpdate",
+          "when": "viewItem == promptId",
+          "group": "1_actions"
+        },
+        {
+          "command": "pvm.promptDiff",
+          "when": "viewItem == promptId",
+          "group": "2_compare"
+        },
+        {
+          "command": "pvm.promptDelete",
+          "when": "viewItem == promptId",
+          "group": "3_danger"
+        },
+        {
+          "command": "pvm.promptDeploy",
+          "when": "viewItem == promptVersion",
+          "group": "1_actions"
+        },
+        {
+          "command": "pvm.snapshotExport",
+          "when": "viewItem == snapshotVersion",
+          "group": "1_actions"
+        },
+        {
+          "command": "pvm.snapshotDiff",
+          "when": "viewItem == snapshotVersion",
+          "group": "2_compare"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.10",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "diff2html": "^3.4.48",
+    "yaml": "^2.8.1"
+  },
+  "files": [
+    "out/**/*",
+    "media/**/*"
+  ]
+}
