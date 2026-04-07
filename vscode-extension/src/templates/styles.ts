@@ -145,6 +145,10 @@ export function getStyles(): string {
       padding: 10px 12px;
       font: inherit;
     }
+    select option {
+      background: var(--vscode-dropdown-background, var(--bg));
+      color: var(--vscode-dropdown-foreground, var(--text));
+    }
     textarea { min-height: 140px; resize: vertical; font-family: var(--font-mono); }
     label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
     .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
