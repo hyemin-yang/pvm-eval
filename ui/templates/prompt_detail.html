@@ -85,6 +85,34 @@
         </form>
       </div>
       {% endif %}
+
+      {% if prompt_data %}
+      <!-- Metadata -->
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">METADATA</h2>
+        <div class="space-y-2 text-sm">
+          <div>
+            <span class="text-gray-500">Author</span>
+            <p class="mt-1">{{ prompt_data.metadata.author or '-' }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500">Created</span>
+            <p class="mt-1">{{ prompt_data.metadata.created_at }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500">Source File</span>
+            <p class="mt-1 font-mono text-xs break-all">{{ prompt_data.metadata.source_file }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500">Checksum</span>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="font-mono text-xs" title="{{ prompt_data.metadata.template_checksum }}">{{ prompt_data.metadata.template_checksum[:16] }}...</span>
+              <button onclick="copyText('{{ prompt_data.metadata.template_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <!-- Prompt Content -->
@@ -96,7 +124,7 @@
           <h2 class="text-sm font-semibold text-gray-500">PROMPT <span class="font-mono text-green-600">v{{ prompt_data.version }}</span></h2>
           <button onclick="copyText(document.getElementById('prompt-text').textContent, this)" class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded bg-green-50 hover:bg-green-100">Copy</button>
         </div>
-        <pre id="prompt-text" class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed" style="max-height: 400px; overflow-y: auto;">{{ prompt_data.prompt }}</pre>
+        <pre id="prompt-text" class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed" style="max-height: 250px; overflow-y: auto;">{{ prompt_data.prompt }}</pre>
       </div>
 
       <!-- LLM Config -->
@@ -129,32 +157,6 @@
           <div id="token-count-result" class="hidden">
             <span class="text-gray-500 text-sm">Input Tokens</span>
             <p id="token-count-value" class="text-2xl font-bold font-mono text-green-600 mt-1"></p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Metadata -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">METADATA</h2>
-        <div class="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span class="text-gray-500">Author</span>
-            <p class="mt-1">{{ prompt_data.metadata.author or '-' }}</p>
-          </div>
-          <div>
-            <span class="text-gray-500">Created</span>
-            <p class="mt-1">{{ prompt_data.metadata.created_at }}</p>
-          </div>
-          <div>
-            <span class="text-gray-500">Source File</span>
-            <p class="mt-1 font-mono text-xs">{{ prompt_data.metadata.source_file }}</p>
-          </div>
-          <div>
-            <span class="text-gray-500">Template Checksum</span>
-            <div class="flex items-center gap-2 mt-1">
-              <span class="font-mono text-xs" title="{{ prompt_data.metadata.template_checksum }}">{{ prompt_data.metadata.template_checksum[:16] }}...</span>
-              <button onclick="copyText('{{ prompt_data.metadata.template_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">Copy</button>
-            </div>
           </div>
         </div>
       </div>
