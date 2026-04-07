@@ -290,7 +290,7 @@ function renderPromptContent(promptData: PromptGetResult): string {
       <div class="flex-between">
         <h3>Prompt ${badge(`v${promptData.version}`, "green")}</h3>
       </div>
-      <div class="mt-4">${codeBlock(promptData.prompt)}</div>
+      <div class="mt-4" style="max-height: 400px; overflow-y: auto;">${codeBlock(promptData.prompt)}</div>
     </section>
 
     <section class="card">

@@ -96,7 +96,7 @@
           <h2 class="text-sm font-semibold text-gray-500">PROMPT <span class="font-mono text-green-600">v{{ prompt_data.version }}</span></h2>
           <button onclick="copyText(document.getElementById('prompt-text').textContent, this)" class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded bg-green-50 hover:bg-green-100">Copy</button>
         </div>
-        <pre id="prompt-text" class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">{{ prompt_data.prompt }}</pre>
+        <pre id="prompt-text" class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed" style="max-height: 400px; overflow-y: auto;">{{ prompt_data.prompt }}</pre>
       </div>
 
       <!-- LLM Config -->

@@ -535,7 +535,7 @@ ${e.comment}`:e.comment}this.doc.range[2]=e.offset;break}default:this.errors.pus
       <div class="flex-between">
         <h3>Prompt ${D(`v${s.version}`,"green")}</h3>
       </div>
-      <div class="mt-4">${ie(s.prompt)}</div>
+      <div class="mt-4" style="max-height: 400px; overflow-y: auto;">${ie(s.prompt)}</div>
     </section>
 
     <section class="card">
