@@ -20,11 +20,18 @@ export class PromptDetailPanel extends BasePanel {
     this.currentVersion = version;
   }
 
+  async isResourceValid(): Promise<boolean> {
+    const ids = await this.cli.listPromptIds();
+    return ids.includes(this.promptId);
+  }
+
   protected async getHtmlContent(): Promise<string> {
     const logoSrc = this.panel!.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "media", "logo.svg")).toString();
     const info = await this.cli.getPromptInfo(this.promptId);
     const selectedVersion = this.resolveCurrentVersion(info);
+    this.currentVersion = selectedVersion;
     const promptData = selectedVersion ? await this.cli.getPrompt(this.promptId, selectedVersion) : null;
+    const tokenModels = await this.cli.listTokenModels();
 
     const actions = [
       actionButton("New Version", "primary", "updatePrompt"),
@@ -44,6 +51,7 @@ export class PromptDetailPanel extends BasePanel {
 
         <div>
           ${promptData ? renderPromptContent(promptData) : `<section class="card"><p class="text-muted text-sm">No version selected.</p></section>`}
+          ${renderTokenCountCard(tokenModels)}
         </div>
       </div>
     `;
@@ -108,6 +116,18 @@ export class PromptDetailPanel extends BasePanel {
           String(message.toVersion ?? ""),
         );
         return;
+      case "tokenCount": {
+        const model = String(message.model ?? "");
+        if (!model || !this.currentVersion) return;
+        try {
+          const result = await this.cli.countTokens(this.promptId, this.currentVersion, model);
+          this.panel?.webview.postMessage({ type: "tokenCountResult", token_count: result.token_count });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          void vscode.window.showErrorMessage(`Token count failed: ${msg}`);
+        }
+        return;
+      }
       default:
         return;
     }
@@ -127,6 +147,28 @@ export class PromptDetailPanel extends BasePanel {
             fromVersion: byId("diff-from").value,
             toVersion: byId("diff-to").value,
           });
+        }
+      });
+
+      const tokenSelect = document.getElementById("token-model-select");
+      if (tokenSelect) {
+        tokenSelect.addEventListener("change", () => {
+          const model = tokenSelect.value;
+          if (model) {
+            send("tokenCount", { model: model });
+          } else {
+            document.getElementById("token-count-result").style.display = "none";
+          }
+        });
+      }
+
+      window.addEventListener("message", (event) => {
+        const msg = event.data;
+        if (msg.type === "tokenCountResult") {
+          const resultDiv = document.getElementById("token-count-result");
+          const valueEl = document.getElementById("token-count-value");
+          valueEl.textContent = msg.token_count.toLocaleString();
+          resultDiv.style.display = "block";
         }
       });
     `;
@@ -216,6 +258,27 @@ function renderDiffCard(info: PromptInfoResult, currentVersion?: string): string
           })),
         )}
         ${actionButton("Diff", "secondary", "open-diff")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTokenCountCard(models: string[]): string {
+  const options = models
+    .map((m) => `<option value="${text(m)}">${text(m)}</option>`)
+    .join("");
+  return `
+    <section class="card">
+      <div class="section-title"><h3>Token Count</h3></div>
+      <div class="stack">
+        <select id="token-model-select" class="select">
+          <option value="">Select a model...</option>
+          ${options}
+        </select>
+        <div id="token-count-result" style="display:none">
+          <span class="text-muted text-sm">Input Tokens</span>
+          <div id="token-count-value" class="stat-number"></div>
+        </div>
       </div>
     </section>
   `;

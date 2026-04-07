@@ -23,6 +23,17 @@ export class PromptFormPanel extends BasePanel {
     );
   }
 
+  async isResourceValid(): Promise<boolean> {
+    if (this.mode === "add") {
+      return true;
+    }
+    if (!this.promptId) {
+      return false;
+    }
+    const ids = await this.cli.listPromptIds();
+    return ids.includes(this.promptId);
+  }
+
   protected async getHtmlContent(): Promise<string> {
     const logoSrc = this.panel!.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "media", "logo.svg")).toString();
     const template =

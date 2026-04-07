@@ -22,6 +22,7 @@ import type {
   SnapshotDiffResult,
   SnapshotManifest,
   SnapshotReadResult,
+  TokenCountResult,
 } from "./types";
 
 type CommandCandidate = {
@@ -227,6 +228,14 @@ export class PvmCli {
 
   async diffPrompt(promptId: string, fromVersion: string, toVersion: string): Promise<PromptDiffResult> {
     return this.executeJson<PromptDiffResult>(["diff", promptId, fromVersion, toVersion]);
+  }
+
+  async listTokenModels(): Promise<string[]> {
+    return this.executeJson<string[]>(["token-count", "--list-models"]);
+  }
+
+  async countTokens(promptId: string, version: string, model: string): Promise<TokenCountResult> {
+    return this.executeJson<TokenCountResult>(["token-count", promptId, version, model]);
   }
 
   async listSnapshots(): Promise<string[]> {
@@ -445,7 +454,7 @@ export class PvmCli {
     return pending;
   }
 
-  private invalidateReads(): void {
+  invalidateReads(): void {
     this.readCache.clear();
   }
 

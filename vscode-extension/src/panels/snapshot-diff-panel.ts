@@ -14,6 +14,14 @@ export class SnapshotDiffPanel extends BasePanel {
     super(extensionUri, "pvm.snapshotDiff", "Snapshot Diff");
   }
 
+  async isResourceValid(): Promise<boolean> {
+    const versions = await this.cli.listSnapshots();
+    return (
+      (this.fromVersion ? versions.includes(this.fromVersion) : true) &&
+      (this.toVersion ? versions.includes(this.toVersion) : true)
+    );
+  }
+
   setVersions(fromVersion?: string, toVersion?: string): void {
     this.fromVersion = fromVersion;
     this.toVersion = toVersion;

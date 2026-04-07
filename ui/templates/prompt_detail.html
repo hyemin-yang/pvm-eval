@@ -116,6 +116,23 @@
         </div>
       </div>
 
+      <!-- Token Count -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">TOKEN COUNT</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-500">Model</label>
+            <select id="token-model-select" class="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-mono">
+              <option value="">Select a model...</option>
+            </select>
+          </div>
+          <div id="token-count-result" class="hidden">
+            <span class="text-gray-500 text-sm">Input Tokens</span>
+            <p id="token-count-value" class="text-2xl font-bold font-mono text-green-600 mt-1"></p>
+          </div>
+        </div>
+      </div>
+
       <!-- Metadata -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-sm font-semibold text-gray-500 mb-3">METADATA</h2>
@@ -145,4 +162,35 @@
     </div>
   </div>
 </div>
+{% if prompt_data %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const select = document.getElementById('token-model-select');
+  const resultDiv = document.getElementById('token-count-result');
+  const valueEl = document.getElementById('token-count-value');
+  if (!select) return;
+
+  const models = await fetch('/api/token-count/models').then(r => r.json());
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener('change', async () => {
+    const model = select.value;
+    if (!model) {
+      resultDiv.classList.add('hidden');
+      return;
+    }
+    const promptId = '{{ prompt_data.id }}';
+    const version = '{{ current_version }}';
+    const data = await fetch('/api/token-count/' + promptId + '/' + version + '?model=' + encodeURIComponent(model)).then(r => r.json());
+    valueEl.textContent = data.token_count.toLocaleString();
+    resultDiv.classList.remove('hidden');
+  });
+});
+</script>
+{% endif %}
 {% endblock %}

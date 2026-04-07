@@ -13,6 +13,11 @@ export class SnapshotDetailPanel extends BasePanel {
     super(extensionUri, `pvm.snapshotDetail.${version}`, `Snapshot: ${version}`);
   }
 
+  async isResourceValid(): Promise<boolean> {
+    const versions = await this.cli.listSnapshots();
+    return versions.includes(this.version);
+  }
+
   protected async getHtmlContent(): Promise<string> {
     const logoSrc = this.panel!.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "media", "logo.svg")).toString();
     const [manifest, snapshotData] = await Promise.all([

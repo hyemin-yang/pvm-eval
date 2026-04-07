@@ -222,6 +222,23 @@ def log(prompt_id: str | None = typer.Option(None, "--id", help="Prompt id")) ->
     print(history_file.read_text(encoding="utf-8").rstrip())
 
 
+@app.command("token-count")
+def token_count(
+    prompt_id: str = typer.Argument(None, metavar="ID"),
+    version: str = typer.Argument(None),
+    model: str = typer.Argument(None),
+    list_models: bool = typer.Option(False, "--list-models", help="List supported models"),
+) -> None:
+    """Count tokens in a prompt version for a specific model."""
+    if list_models:
+        _print_json(_project().list_token_models())
+        return
+    if not prompt_id or not version or not model:
+        typer.secho("Usage: pvm token-count <ID> <VERSION> <MODEL>", fg=typer.colors.RED, err=True)
+        raise SystemExit(1)
+    _print_json(_project().count_tokens(prompt_id, version, model))
+
+
 @app.command("project")
 def project() -> None:
     """Show the current project summary as a logical tree."""

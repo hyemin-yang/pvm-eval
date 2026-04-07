@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 
 import * as vscode from "vscode";
@@ -37,7 +38,81 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(vscode.window.registerTreeDataProvider("pvmExplorer", treeProvider));
 
-  const refresh = () => treeProvider.refresh();
+  const refresh = () => {
+    cli.invalidateReads();
+    treeProvider.refresh();
+  };
+
+  const refreshWithPanel = async () => {
+    refresh();
+    const valid = await cli.isProjectValid();
+    if (!valid) {
+      if (currentMainPanel) {
+        currentMainPanel.dispose();
+        currentMainPanel = undefined;
+      }
+      await vscode.commands.executeCommand("pvm.init");
+      return;
+    }
+    if (currentMainPanel) {
+      const resourceValid = await currentMainPanel.isResourceValid();
+      if (!resourceValid) {
+        currentMainPanel.dispose();
+        currentMainPanel = undefined;
+        await vscode.commands.executeCommand("pvm.dashboard");
+        return;
+      }
+      await currentMainPanel.update();
+    }
+  };
+
+  // Poll .pvm directory structure to detect any external changes
+  const pvmDir = path.join(workspaceRoot, ".pvm");
+  const promptsDir = path.join(pvmDir, "prompts");
+  const snapshotsDir = path.join(pvmDir, "snapshots", "versions");
+
+  const getPvmFingerprint = (): string => {
+    try {
+      if (!fs.existsSync(pvmDir)) {
+        return "";
+      }
+      const prompts = fs.existsSync(promptsDir)
+        ? fs.readdirSync(promptsDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory())
+            .map((e) => e.name)
+            .sort()
+        : [];
+      const snapshots = fs.existsSync(snapshotsDir)
+        ? fs.readdirSync(snapshotsDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory())
+            .map((e) => e.name)
+            .sort()
+        : [];
+      const promptVersions = prompts.map((id) => {
+        const versionsDir = path.join(promptsDir, id, "versions");
+        if (!fs.existsSync(versionsDir)) { return `${id}:`; }
+        const vs = fs.readdirSync(versionsDir, { withFileTypes: true })
+          .filter((e) => e.isDirectory())
+          .map((e) => e.name)
+          .sort();
+        return `${id}:${vs.join(",")}`;
+      });
+      return `P[${promptVersions.join(";")}]S[${snapshots.join(",")}]`;
+    } catch {
+      return "";
+    }
+  };
+
+  let lastFingerprint = getPvmFingerprint();
+  const pollInterval = setInterval(() => {
+    const fingerprint = getPvmFingerprint();
+    if (fingerprint !== lastFingerprint) {
+      lastFingerprint = fingerprint;
+      void refreshWithPanel();
+    }
+  }, 1500);
+  context.subscriptions.push({ dispose: () => clearInterval(pollInterval) });
+
   const showMainPanel = async (panel: BasePanel): Promise<void> => {
     if (currentMainPanel && currentMainPanel !== panel) {
       currentMainPanel.dispose();

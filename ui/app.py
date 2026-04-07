@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, Query, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -182,6 +182,18 @@ async def prompt_add_editor(
             yaml_content=yaml_content,
         )
     return RedirectResponse(f"/prompts/{result['id']}", status_code=303)
+
+
+@app.get("/api/token-count/models")
+def token_count_models():
+    project = get_project()
+    return JSONResponse(content=project.list_token_models())
+
+
+@app.get("/api/token-count/{prompt_id}/{version}")
+def token_count_api(prompt_id: str, version: str, model: str = Query(...)):
+    project = get_project()
+    return JSONResponse(content=project.count_tokens(prompt_id, version, model))
 
 
 @app.get("/prompts/{prompt_id}", response_class=HTMLResponse)

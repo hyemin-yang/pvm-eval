@@ -150,3 +150,10 @@ export interface HistoryEntry {
   prompt_count?: number;
   template_checksum?: string;
 }
+
+export interface TokenCountResult {
+  id: string;
+  version: string;
+  model: string;
+  token_count: number;
+}

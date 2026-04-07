@@ -15,6 +15,11 @@ export class PromptDiffPanel extends BasePanel {
     super(extensionUri, `pvm.promptDiff.${promptId}`, `Prompt Diff: ${promptId}`);
   }
 
+  async isResourceValid(): Promise<boolean> {
+    const ids = await this.cli.listPromptIds();
+    return ids.includes(this.promptId);
+  }
+
   setVersions(fromVersion?: string, toVersion?: string): void {
     this.fromVersion = fromVersion;
     this.toVersion = toVersion;

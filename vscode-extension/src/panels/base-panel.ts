@@ -43,6 +43,10 @@ export abstract class BasePanel {
 
   protected async onMessage(_message: unknown): Promise<void> {}
 
+  async isResourceValid(): Promise<boolean> {
+    return true;
+  }
+
   dispose(): void {
     this.panel?.dispose();
   }
