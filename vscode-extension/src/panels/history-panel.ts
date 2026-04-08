@@ -35,7 +35,7 @@ export class HistoryPanel extends BasePanel {
       <section class="card">
         <label for="history-filter">Filter</label>
         <div class="flex wrap">
-          <div style="min-width:260px; flex:1">
+          <div class="select-wrap">
             ${select("history-filter", [
               { value: "", label: "All (Snapshot history)", selected: !this.selectedPromptId },
               ...promptIds.map((promptId) => ({

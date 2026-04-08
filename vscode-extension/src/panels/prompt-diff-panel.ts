@@ -62,7 +62,7 @@ export class PromptDiffPanel extends BasePanel {
       <section class="card">
         <div class="section-title"><h3>Compare Other Versions</h3></div>
         <div class="flex wrap">
-          <div style="min-width:220px">${select(
+          <div class="select-wrap">${select(
             "diff-from",
             versions.map((version) => ({
               value: version,
@@ -70,7 +70,7 @@ export class PromptDiffPanel extends BasePanel {
               selected: version === this.fromVersion,
             })),
           )}</div>
-          <div style="min-width:220px">${select(
+          <div class="select-wrap">${select(
             "diff-to",
             versions.map((version) => ({
               value: version,

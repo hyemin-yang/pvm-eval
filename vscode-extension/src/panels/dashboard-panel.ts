@@ -86,28 +86,26 @@ export class DashboardPanel extends BasePanel {
         </div>
       </section>
 
-      <div class="grid dashboard-grid">
-        <section class="card dashboard-card">
-          <div class="section-title"><h3>Project Tree</h3></div>
-          <div class="mt-4 dashboard-card-body">${codeBlock(projectTree)}</div>
-        </section>
+      <section class="card">
+        <div class="flex-between">
+          <h3>Prompts</h3>
+          <div class="stat-number">${prompts.length}</div>
+        </div>
+        <div class="mt-4">${promptTable}</div>
+      </section>
 
-        <section class="card dashboard-card">
-          <div class="flex-between">
-            <h3>Prompts</h3>
-            <div class="stat-number">${prompts.length}</div>
-          </div>
-          <div class="mt-4 dashboard-card-body">${promptTable}</div>
-        </section>
+      <section class="card">
+        <div class="flex-between">
+          <h3>Snapshots</h3>
+          <div class="stat-number">${snapshots.length}</div>
+        </div>
+        <div class="mt-4">${snapshotsHtml}</div>
+      </section>
 
-        <section class="card dashboard-card">
-          <div class="flex-between">
-            <h3>Snapshots</h3>
-            <div class="stat-number">${snapshots.length}</div>
-          </div>
-          <div class="mt-4 dashboard-card-body">${snapshotsHtml}</div>
-        </section>
-      </div>
+      <section class="card">
+        <div class="section-title"><h3>Project Tree</h3></div>
+        <div class="mt-4">${codeBlock(projectTree)}</div>
+      </section>
     `;
   }
 

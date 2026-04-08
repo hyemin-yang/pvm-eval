@@ -48,9 +48,9 @@ export class SnapshotDiffPanel extends BasePanel {
       )}
 
       <div class="summary-grid">
-        <div class="summary-tile"><div class="count" style="color:#16a34a">${diff.added_ids.length}</div><div class="text-muted text-sm">Added</div></div>
-        <div class="summary-tile"><div class="count" style="color:#dc2626">${diff.removed_ids.length}</div><div class="text-muted text-sm">Removed</div></div>
-        <div class="summary-tile"><div class="count" style="color:#ca8a04">${diff.changed_ids.length}</div><div class="text-muted text-sm">Changed</div></div>
+        <div class="summary-tile"><div class="count" style="color:var(--green)">${diff.added_ids.length}</div><div class="text-muted text-sm">Added</div></div>
+        <div class="summary-tile"><div class="count" style="color:var(--red)">${diff.removed_ids.length}</div><div class="text-muted text-sm">Removed</div></div>
+        <div class="summary-tile"><div class="count" style="color:var(--yellow)">${diff.changed_ids.length}</div><div class="text-muted text-sm">Changed</div></div>
       </div>
 
       ${renderIdSection("Added", diff.added_ids, "green")}
@@ -60,7 +60,7 @@ export class SnapshotDiffPanel extends BasePanel {
       <section class="card">
         <div class="section-title"><h3>Compare Other Versions</h3></div>
         <div class="flex wrap">
-          <div style="min-width:220px">${select(
+          <div class="select-wrap">${select(
             "snapshot-from",
             versions.map((version) => ({
               value: version,
@@ -68,7 +68,7 @@ export class SnapshotDiffPanel extends BasePanel {
               selected: version === this.fromVersion,
             })),
           )}</div>
-          <div style="min-width:220px">${select(
+          <div class="select-wrap">${select(
             "snapshot-to",
             versions.map((version) => ({
               value: version,

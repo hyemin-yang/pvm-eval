@@ -52,7 +52,7 @@ export function codeBlock(content: string): string {
 export function table(headers: string[], rows: string[][]): string {
   const head = headers.map((header) => `<th>${text(header)}</th>`).join("");
   const body = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("");
-  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 export function clickableTable(
@@ -68,7 +68,7 @@ export function clickableTable(
           .join("")}</tr>`,
     )
     .join("");
-  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 export function select(

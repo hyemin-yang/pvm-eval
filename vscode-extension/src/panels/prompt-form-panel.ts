@@ -255,11 +255,11 @@ function renderFormFields(template: Record<string, unknown>, disableId: boolean)
 
   return `
     <div class="grid grid-2">
-      <div style="grid-column: 1 / -1">
+      <div class="full-width">
         <label for="prompt-id">ID</label>
         <input id="prompt-id" value="${text(template.id ?? "")}" ${disableId ? "disabled" : ""} />
       </div>
-      <div style="grid-column: 1 / -1">
+      <div class="full-width">
         <label for="prompt-text">Prompt</label>
         <textarea id="prompt-text">${text(template.prompt ?? "")}</textarea>
       </div>
@@ -287,7 +287,7 @@ function renderFormFields(template: Record<string, unknown>, disableId: boolean)
         <label for="max-tokens">Max Tokens</label>
         <input id="max-tokens" type="number" step="1" value="${text(params.max_tokens ?? "")}" />
       </div>
-      <div style="grid-column: 1 / -1">
+      <div class="full-width">
         <label>Extra Fields</label>
         <div id="extra-fields" class="stack"></div>
         ${extraFields
