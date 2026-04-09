@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}pvm - Add Prompt{% endblock %}
+{% block title %}pvm - Prompt 추가{% endblock %}
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
-  <h1 class="text-2xl font-bold">Add Prompt</h1>
+  <h1 class="text-2xl font-bold">Prompt 추가</h1>
 
   {% if message %}
   <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded text-sm">
@@ -13,11 +13,11 @@
   <!-- Tab Switcher -->
   <div class="flex border-b">
     <button onclick="switchTab('form')" id="tab-form"
-            class="px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600">Form</button>
+            class="px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600">폼 입력</button>
     <button onclick="switchTab('upload')" id="tab-upload"
-            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">File Upload</button>
+            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">파일 업로드</button>
     <button onclick="switchTab('editor')" id="tab-editor"
-            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">YAML Editor</button>
+            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">YAML 편집기</button>
   </div>
 
   <!-- Form Input -->
@@ -25,7 +25,7 @@
     <form method="post" action="/prompts/add/form" class="space-y-6">
       <!-- Required -->
       <div>
-        <h3 class="text-sm font-bold text-red-500 mb-4 border-b border-red-200 pb-2">REQUIRED</h3>
+        <h3 class="text-sm font-bold text-red-500 mb-4 border-b border-red-200 pb-2">필수 항목</h3>
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">ID</label>
@@ -34,7 +34,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Prompt</label>
-            <textarea name="prompt_text" rows="6" required placeholder="Classify the intent of the user input."
+            <textarea name="prompt_text" rows="6" required placeholder="사용자 입력의 의도를 분류하세요."
                       class="w-full text-sm font-mono border rounded px-3 py-2"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -54,16 +54,16 @@
 
       <!-- Optional -->
       <div>
-        <h3 class="text-sm font-bold text-gray-500 mb-4 border-b border-gray-200 pb-2">OPTIONAL</h3>
+        <h3 class="text-sm font-bold text-gray-500 mb-4 border-b border-gray-200 pb-2">선택 항목</h3>
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <input type="text" name="description" placeholder="Describe the role of this prompt"
+              <label class="block text-sm font-medium text-gray-700 mb-1">설명</label>
+              <input type="text" name="description" placeholder="이 Prompt의 역할을 설명하세요"
                      class="w-full text-sm border rounded px-3 py-2">
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">작성자</label>
               <input type="text" name="author" placeholder="alice"
                      class="w-full text-sm border rounded px-3 py-2">
             </div>
@@ -85,15 +85,15 @@
 
       <!-- Extra Fields -->
       <div>
-        <h3 class="text-sm font-bold text-blue-500 mb-4 border-b border-blue-200 pb-2">EXTRA FIELDS</h3>
+        <h3 class="text-sm font-bold text-blue-500 mb-4 border-b border-blue-200 pb-2">추가 필드</h3>
         <div id="extra-fields" class="space-y-2"></div>
         <button type="button" onclick="addExtraField()"
-                class="mt-2 text-sm text-green-600 hover:underline">+ Add Field</button>
+                class="mt-2 text-sm text-green-600 hover:underline">+ 필드 추가</button>
       </div>
 
       <!-- Bump Level -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Bump Level</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">버전 단위</label>
         <div class="flex gap-4">
           <label class="flex items-center gap-2">
             <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
@@ -111,7 +111,7 @@
       </div>
 
       <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-        Add Prompt
+        Prompt 추가
       </button>
     </form>
   </div>
@@ -120,13 +120,13 @@
   <div id="panel-upload" class="bg-white rounded-lg shadow p-6 hidden">
     <form method="post" action="/prompts/add" enctype="multipart/form-data" class="space-y-6">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">YAML Template File</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">YAML 템플릿 파일</label>
         <input type="file" name="template_file" accept=".yaml,.yml" required
                class="w-full text-sm border rounded px-3 py-2 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Bump Level</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">버전 단위</label>
         <div class="flex gap-4">
           <label class="flex items-center gap-2">
             <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
@@ -144,7 +144,7 @@
       </div>
 
       <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-        Add Prompt
+        Prompt 추가
       </button>
     </form>
   </div>
@@ -153,13 +153,13 @@
   <div id="panel-editor" class="bg-white rounded-lg shadow p-6 hidden">
     <form method="post" action="/prompts/add/editor" class="space-y-6">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">YAML Template</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">YAML 템플릿</label>
         <textarea name="yaml_content" rows="20" required
                   class="w-full text-sm font-mono border rounded px-3 py-2 bg-gray-50 focus:bg-white">{{ yaml_content }}</textarea>
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Bump Level</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">버전 단위</label>
         <div class="flex gap-4">
           <label class="flex items-center gap-2">
             <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
@@ -177,7 +177,7 @@
       </div>
 
       <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-        Add Prompt
+        Prompt 추가
       </button>
     </form>
   </div>
@@ -189,8 +189,8 @@ function addExtraField() {
   const row = document.createElement('div');
   row.className = 'flex gap-2 items-center';
   row.innerHTML = `
-    <input type="text" name="extra_keys" placeholder="key" class="w-1/3 text-sm font-mono border rounded px-3 py-2">
-    <input type="text" name="extra_values" placeholder="value" class="flex-1 text-sm font-mono border rounded px-3 py-2">
+    <input type="text" name="extra_keys" placeholder="키" class="w-1/3 text-sm font-mono border rounded px-3 py-2">
+    <input type="text" name="extra_values" placeholder="값" class="flex-1 text-sm font-mono border rounded px-3 py-2">
     <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-2">&times;</button>
   `;
   container.appendChild(row);

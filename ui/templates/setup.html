@@ -1,44 +1,50 @@
 {% extends "base.html" %}
-{% block title %}pvm - Setup{% endblock %}
+{% block title %}pvm - 설정{% endblock %}
 {% block content %}
 <div class="max-w-lg mx-auto mt-16 space-y-6">
   <div class="text-center">
     <h1 class="text-3xl font-bold text-green-400">pvm</h1>
-    <p class="text-gray-500 mt-2">prompt version manager</p>
+    <p class="text-gray-500 mt-2">Prompt Version Manager</p>
   </div>
 
   <div class="bg-white rounded-lg shadow p-8 space-y-6">
     <div>
-      <span class="text-sm text-gray-500">Path</span>
+      <span class="text-sm text-gray-500">경로</span>
       <p class="font-mono text-sm mt-1">{{ root_path }}</p>
     </div>
 
     {% if exists %}
     <!-- .pvm exists but corrupted -->
     <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded text-sm">
-      A .pvm directory exists but is corrupted. You can destroy it and start fresh.
+      .pvm 디렉토리가 존재하지만 손상되었습니다. 삭제 후 새로 시작할 수 있습니다.
     </div>
     <div class="flex gap-3">
       <form method="post" action="/project/destroy" class="flex-1"
-            onsubmit="return confirm('This will permanently delete the corrupted .pvm directory. Continue?')">
+            onsubmit="return confirm('손상된 .pvm 디렉토리를 영구 삭제합니다. 계속하시겠습니까?')">
         <button type="submit" class="w-full px-4 py-2 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100">
-          Destroy
+          삭제
         </button>
       </form>
     </div>
     {% else %}
     <!-- No .pvm at all -->
     <div class="bg-gray-50 border border-gray-200 text-gray-600 px-4 py-3 rounded text-sm">
-      No pvm project found at this path. Create one to get started.
+      이 경로에 pvm 프로젝트가 없습니다. 새로 생성하세요.
     </div>
     <form method="post" action="/project/init" class="space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">프로젝트 이름</label>
         <input type="text" name="name" value="my-project" required
                class="w-full text-sm font-mono border rounded px-3 py-2">
       </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">프로젝트 설명 <span class="text-gray-400 font-normal">(선택)</span></label>
+        <textarea name="description" rows="3"
+                  class="w-full text-sm border rounded px-3 py-2"
+                  placeholder="이 프로젝트는 어떤 용도인가요?"></textarea>
+      </div>
       <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-        Initialize Project
+        프로젝트 생성
       </button>
     </form>
     {% endif %}

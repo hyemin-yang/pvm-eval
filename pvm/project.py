@@ -17,6 +17,7 @@ from pvm.prompts.delete import delete_prompt
 from pvm.prompts.deploy import deploy_prompt
 from pvm.prompts.diff import diff_prompt_versions
 from pvm.prompts.get import get_prompt
+from pvm.prompts.edit_info import edit_prompt_info
 from pvm.prompts.get_info import get_prompt_info
 from pvm.prompts.list_ids import list_prompt_ids, list_prompt_versions_for_id
 from pvm.prompts.rollback import rollback_prompt
@@ -131,6 +132,13 @@ class PVMProject:
         """Read stable prompt metadata and version summary."""
         self.require_valid()
         return get_prompt_info(self.root, prompt_id)
+
+    def edit_prompt_info(
+        self, prompt_id: str, *, description: str | None = None, author: str | None = None
+    ) -> dict[str, Any]:
+        """Update mutable fields in prompt info."""
+        self.require_valid()
+        return edit_prompt_info(self.root, prompt_id, description=description, author=author)
 
     def delete_prompt(self, prompt_id: str) -> dict[str, Any]:
         """Delete a prompt and all its versions entirely."""

@@ -9,8 +9,8 @@
     </div>
     <div class="flex gap-2">
       <a href="/snapshots/{{ manifest.version }}/export"
-         class="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">Export ZIP</a>
-      <a href="/snapshots" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; Back</a>
+         class="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">ZIP 내보내기</a>
+      <a href="/snapshots" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; 돌아가기</a>
     </div>
   </div>
 
@@ -18,25 +18,25 @@
   <div class="bg-white rounded-lg shadow p-6">
     <div class="grid grid-cols-3 gap-4 text-sm">
       <div>
-        <span class="text-gray-500">Prompts</span>
+        <span class="text-gray-500">Prompt 수</span>
         <p class="mt-1 text-lg font-bold">{{ manifest.prompt_count }}</p>
       </div>
       <div>
-        <span class="text-gray-500">Checksum</span>
+        <span class="text-gray-500">체크섬</span>
         <div class="flex items-center gap-2 mt-1">
           <span class="font-mono text-xs" title="{{ manifest.snapshot_checksum }}">{{ manifest.snapshot_checksum[:16] }}...</span>
-          <button onclick="copyText('{{ manifest.snapshot_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">Copy</button>
+          <button onclick="copyText('{{ manifest.snapshot_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">복사</button>
         </div>
       </div>
       <div>
-        <span class="text-gray-500">Created</span>
+        <span class="text-gray-500">생성일</span>
         <p class="mt-1">{{ manifest.created_at }}</p>
       </div>
     </div>
   </div>
 
   <!-- Prompts in Snapshot -->
-  <h2 class="text-lg font-semibold">Included Prompts</h2>
+  <h2 class="text-lg font-semibold">포함된 Prompt</h2>
 
   {% for prompt_id, prompt in snapshot_data.prompts.items() %}
   <div class="bg-white rounded-lg shadow p-6 space-y-4">
@@ -53,7 +53,7 @@
 
     <!-- LLM Config -->
     <div>
-      <h4 class="text-xs font-semibold text-gray-400 mb-2">LLM CONFIG</h4>
+      <h4 class="text-xs font-semibold text-gray-400 mb-2">LLM 설정</h4>
       <div class="grid grid-cols-2 gap-4 text-sm">
         {% for key, value in prompt.llm.items() %}
         <div>

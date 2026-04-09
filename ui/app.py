@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ from fastapi.templating import Jinja2Templates
 
 from pvm.core.errors import PVMError
 from pvm.project import PVMProject
+from pvm.storage.history import read_history
+from pvm.storage.yaml_io import dump_yaml
 
 UI_DIR = Path(__file__).parent
 app = FastAPI(title="pvm ui")
@@ -29,6 +32,59 @@ def _render(request: Request, name: str, **kwargs: Any):
     return templates.TemplateResponse(request=request, name=name, context=kwargs)
 
 
+def _parse_iso_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _format_timestamp(value: str | None) -> str:
+    dt = _parse_iso_timestamp(value)
+    if dt is None:
+        return value or "-"
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _activity_label(entry: dict[str, Any]) -> str:
+    event = entry.get("event")
+    if event == "add":
+        version = entry.get("version")
+        return f"Prompt {entry.get('id')} added" + (f" ({version})" if version else "")
+    if event == "deploy":
+        to_version = entry.get("to_version")
+        return f"Prompt {entry.get('id')} deployed" + (f" to {to_version}" if to_version else "")
+    if event == "rollback":
+        to_version = entry.get("to_version")
+        return f"Prompt {entry.get('id')} rolled back" + (f" to {to_version}" if to_version else "")
+    if event == "create":
+        version = entry.get("version")
+        return f"Snapshot created" + (f" ({version})" if version else "")
+    return str(event or "activity")
+
+
+def _activity_href(entry: dict[str, Any]) -> str:
+    event = entry.get("event")
+    if event == "create" and entry.get("version"):
+        return f"/snapshots/{entry['version']}"
+    if entry.get("id"):
+        return f"/prompts/{entry['id']}"
+    return "/history"
+
+
+def _activity_tone(entry: dict[str, Any]) -> str:
+    event = entry.get("event")
+    if event == "deploy":
+        return "green"
+    if event == "rollback":
+        return "yellow"
+    if event == "create":
+        return "blue"
+    return "gray"
+
+
 # --- Dashboard ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -42,6 +98,50 @@ def dashboard(request: Request):
     config = project.load_config()
     integrity = project.check_integrity()
     prompt_ids = project.list_prompt_ids()
+
+    prompts_summary = []
+    for pid in prompt_ids:
+        info = project.get_prompt_info(pid)
+        prompts_summary.append(info)
+
+    # 최근 추가된 Prompt (created_at 기준)
+    recent_prompts = sorted(
+        prompts_summary,
+        key=lambda item: _parse_iso_timestamp(item["info"].get("created_at"))
+            or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )[:5]
+
+    kpis = [
+        {"label": "전체 Prompt", "value": len(prompts_summary)},
+    ]
+
+    return _render(request, "dashboard.html",
+        config=config,
+        integrity=integrity,
+        recent_prompts=recent_prompts,
+        kpis=kpis,
+    )
+
+
+@app.post("/project/edit-info")
+def project_edit_info(
+    description: str = Form(""),
+):
+    project = get_project()
+    config = project.load_config()
+    config["description"] = description.strip()
+    dump_yaml(project.paths.config_file, config)
+    return RedirectResponse("/", status_code=303)
+
+
+# --- Tree ---
+
+@app.get("/tree", response_class=HTMLResponse)
+def tree(request: Request):
+    project = get_project()
+    config = project.load_config()
+    prompt_ids = project.list_prompt_ids()
     snapshots = project.list_snapshots()
 
     prompts_summary = []
@@ -49,9 +149,8 @@ def dashboard(request: Request):
         info = project.get_prompt_info(pid)
         prompts_summary.append(info)
 
-    return _render(request, "dashboard.html",
+    return _render(request, "tree.html",
         config=config,
-        integrity=integrity,
         prompts_summary=prompts_summary,
         snapshots=snapshots,
         root_path=str(project.root),
@@ -68,6 +167,11 @@ def prompt_list(request: Request):
     for pid in prompt_ids:
         info = project.get_prompt_info(pid)
         prompts_summary.append(info)
+    prompts_summary.sort(
+        key=lambda p: _parse_iso_timestamp(p["info"].get("created_at"))
+            or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
     return _render(request, "prompts.html",
         prompts_summary=prompts_summary,
     )
@@ -392,25 +496,23 @@ async def prompt_update_upload(request: Request, prompt_id: str):
     return RedirectResponse(f"/prompts/{prompt_id}", status_code=303)
 
 
-@app.post("/prompts/{prompt_id}/deploy")
-def prompt_deploy(prompt_id: str, version: str = Form(...)):
-    project = get_project()
-    project.deploy(prompt_id, version)
-    return RedirectResponse(f"/prompts/{prompt_id}", status_code=303)
-
-
-@app.post("/prompts/{prompt_id}/rollback")
-def prompt_rollback(prompt_id: str):
-    project = get_project()
-    project.rollback(prompt_id)
-    return RedirectResponse(f"/prompts/{prompt_id}", status_code=303)
-
 
 @app.post("/prompts/{prompt_id}/delete")
 def prompt_delete(prompt_id: str):
     project = get_project()
     project.delete_prompt(prompt_id)
     return RedirectResponse("/prompts", status_code=303)
+
+
+@app.post("/prompts/{prompt_id}/edit-info")
+def prompt_edit_info(
+    prompt_id: str,
+    description: str = Form(""),
+    author: str = Form(""),
+):
+    project = get_project()
+    project.edit_prompt_info(prompt_id, description=description, author=author)
+    return RedirectResponse(f"/prompts/{prompt_id}", status_code=303)
 
 
 @app.get("/prompts/{prompt_id}/diff", response_class=HTMLResponse)
@@ -430,64 +532,6 @@ def prompt_diff(
         versions=versions,
     )
 
-
-# --- Snapshots ---
-
-@app.get("/snapshots", response_class=HTMLResponse)
-def snapshot_list(request: Request):
-    project = get_project()
-    snapshots = project.list_snapshots()
-    snapshots_summary = []
-    for ver in snapshots:
-        manifest = project.get_snapshot(ver)
-        snapshots_summary.append(manifest)
-    return _render(request, "snapshots.html",
-        snapshots_summary=snapshots_summary,
-    )
-
-
-@app.post("/snapshots/create")
-def snapshot_create(bump_level: str = Form("patch")):
-    project = get_project()
-    project.create_snapshot(bump_level=bump_level)
-    return RedirectResponse("/snapshots", status_code=303)
-
-
-@app.get("/snapshots/{version}", response_class=HTMLResponse)
-def snapshot_detail(request: Request, version: str):
-    project = get_project()
-    manifest = project.get_snapshot(version)
-    snapshot_data = project.read_snapshot(version)
-    return _render(request, "snapshot_detail.html",
-        manifest=manifest,
-        snapshot_data=snapshot_data,
-    )
-
-
-@app.get("/snapshots/{version}/export")
-def snapshot_export(version: str):
-    project = get_project()
-    result = project.export_snapshot(version)
-    return FileResponse(
-        result["output_path"],
-        filename=f"snapshot-{version}.zip",
-        media_type="application/zip",
-    )
-
-
-@app.get("/snapshots/diff/compare", response_class=HTMLResponse)
-def snapshot_diff(
-    request: Request,
-    from_version: str = Query(..., alias="from"),
-    to_version: str = Query(..., alias="to"),
-):
-    project = get_project()
-    diff_result = project.diff_snapshot(from_version, to_version)
-    snapshots = project.list_snapshots()
-    return _render(request, "snapshot_diff.html",
-        diff_result=diff_result,
-        snapshots=snapshots,
-    )
 
 
 # --- History ---
@@ -535,9 +579,13 @@ def project_open():
 # --- Project Init / Reset / Destroy ---
 
 @app.post("/project/init")
-def project_init(name: str = Form("my-project")):
+def project_init(name: str = Form("my-project"), description: str = Form("")):
     project = get_project()
     project.init(name)
+    if description.strip():
+        config = project.load_config()
+        config["description"] = description.strip()
+        dump_yaml(project.paths.config_file, config)
     return RedirectResponse("/", status_code=303)
 
 

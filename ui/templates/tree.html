@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}pvm - Project Tree{% endblock %}
+{% block main_class %}flex flex-col{% endblock %}
+{% block content_wrapper_class %}flex flex-1 flex-col w-full max-w-[90rem] min-h-[calc(100vh-4rem)]{% endblock %}
+{% block content %}
+<div class="flex flex-1 flex-col gap-6 min-h-0 w-full tree-page">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Project Tree</h1>
+    <span class="text-sm text-gray-500 font-mono">{{ root_path }}</span>
+  </div>
+
+  <div class="flex gap-4 flex-1 min-h-0">
+    <!-- Prompts Panel -->
+    <div class="flex-1 rounded-lg shadow overflow-hidden flex flex-col bg-gray-900 min-h-0">
+      <div class="bg-gray-800 px-4 py-2 shrink-0 flex items-center gap-2">
+        <span class="text-sm font-semibold text-gray-400">Prompts</span>
+        <span class="text-xs text-gray-600">({{ prompts_summary | length }})</span>
+      </div>
+      <div class="flex-1 overflow-y-auto p-5 font-mono text-sm leading-loose">
+        <div class="text-green-400 font-semibold">.pvm/prompts/</div>
+        {% if prompts_summary %}
+          {% for p in prompts_summary %}
+          <div class="ml-4 mt-1">
+            <button onclick="togglePrompt('tree-{{ p.id }}')"
+                    class="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition">
+              <span id="tree-{{ p.id }}-arrow" class="text-gray-500 text-xs">▶</span>
+              <span class="hover:underline">{{ p.id }}/</span>
+              <span class="text-gray-600 text-xs ml-1">{{ p.versions | length }}개</span>
+            </button>
+            <div id="tree-{{ p.id }}" class="hidden ml-6">
+              {% for ver in p.versions %}
+              <a href="/prompts/{{ p.id }}/version/{{ ver }}"
+                 class="block hover:underline {% if p.production and ver == p.production.version %}text-green-400 font-semibold{% else %}text-gray-400 hover:text-gray-200{% endif %}">
+                {% if p.production and ver == p.production.version %}* {% endif %}{{ ver }}{% if p.production and ver == p.production.version %} (prod){% endif %}
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="ml-4 text-gray-500 italic">비어있음</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Snapshots Panel -->
+    <div class="flex-1 rounded-lg shadow overflow-hidden flex flex-col bg-gray-900 min-h-0">
+      <div class="bg-gray-800 px-4 py-2 shrink-0 flex items-center gap-2">
+        <span class="text-sm font-semibold text-gray-400">Snapshots</span>
+        <span class="text-xs text-gray-600">({{ snapshots | length }})</span>
+      </div>
+      <div class="flex-1 overflow-y-auto p-5 font-mono text-sm leading-loose">
+        <div class="text-green-400 font-semibold">.pvm/snapshots/</div>
+        {% if snapshots %}
+          {% for ver in snapshots | reverse %}
+          <div class="ml-4 mt-1">
+            <a href="/snapshots/{{ ver }}" class="text-blue-400 hover:underline">{{ ver }}</a>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="ml-4 text-gray-500 italic">비어있음</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePrompt(id) {
+  const body = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  const isHidden = body.classList.toggle('hidden');
+  arrow.textContent = isHidden ? '▶' : '▼';
+}
+</script>
+{% endblock %}
