@@ -1,32 +1,175 @@
 {% extends "base.html" %}
 {% block title %}pvm - {{ info.id }}{% endblock %}
 {% block content %}
-<div class="space-y-6">
+<div class="flex flex-col gap-6" style="height:calc(100vh - 4rem)">
   <!-- Header -->
-  <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold font-mono">{{ info.id }}</h1>
-      <p class="text-sm text-gray-500 mt-1">{{ info.info.description or '' }}</p>
-    </div>
-    <div class="flex gap-2">
-      {% if info.production %}
-      <form method="post" action="/prompts/{{ info.id }}/rollback">
-        <button type="submit" class="px-3 py-1.5 text-sm bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100"
-                onclick="return confirm('Rollback to previous version?')">Rollback</button>
-      </form>
+  <div class="flex items-start justify-between shrink-0">
+    <div class="space-y-1">
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-bold font-mono">{{ info.id }}</h1>
+      </div>
+      <p class="text-sm text-gray-600">{{ info.info.description or '설명 없음' }}</p>
+      {% if info.info.author %}
+      <p class="text-xs text-gray-400">by {{ info.info.author }}</p>
       {% endif %}
+      <div class="flex items-center gap-2 pt-1">
+        <button onclick="document.getElementById('edit-info-modal').classList.remove('hidden')"
+                class="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded hover:border-gray-400 transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          수정
+        </button>
+        {% if prompt_data %}
+        <div class="relative">
+          <button onclick="toggleMetaPopover()" id="meta-btn"
+                  class="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded hover:border-gray-400 transition flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            메타데이터
+          </button>
+          <div id="meta-popover" class="hidden absolute left-0 top-8 z-30 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-4 space-y-3 animate-fade-in">
+            <div class="absolute -top-2 left-4 w-3 h-3 bg-white border-l border-t border-gray-200 rotate-45"></div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">메타데이터</p>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between gap-4">
+                <span class="text-gray-400 shrink-0">작성자</span>
+                <span class="text-gray-700 font-medium text-right">{{ prompt_data.metadata.author or '-' }}</span>
+              </div>
+              <div class="flex justify-between gap-4">
+                <span class="text-gray-400 shrink-0">생성일</span>
+                <span class="text-gray-700 text-right font-mono text-xs">{{ prompt_data.metadata.created_at }}</span>
+              </div>
+              <div class="flex justify-between gap-4">
+                <span class="text-gray-400 shrink-0">원본 파일</span>
+                <span class="text-gray-700 font-mono text-xs text-right break-all">{{ prompt_data.metadata.source_file }}</span>
+              </div>
+              <div>
+                <span class="text-gray-400">체크섬</span>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="font-mono text-xs text-gray-600">{{ prompt_data.metadata.template_checksum[:16] }}...</span>
+                  <button onclick="copyText('{{ prompt_data.metadata.template_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">복사</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <!-- 새 버전 (가장 prominent) -->
+      <a href="/prompts/{{ info.id }}/update"
+         class="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm">+ 새 버전</a>
+      <!-- 구분선 -->
+      <div class="w-px h-6 bg-gray-200"></div>
+      <!-- 내보내기 -->
+      {% if prompt_data %}
+      <div class="relative" id="export-wrap">
+        <button onclick="document.getElementById('export-menu').classList.toggle('hidden')"
+                class="px-3 py-1.5 text-sm bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 flex items-center gap-1">
+          내보내기
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div id="export-menu" class="hidden absolute right-0 top-9 z-30 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-28">
+          {% for fmt, label in [('txt','TXT'),('md','Markdown'),('json','JSON'),('yaml','YAML')] %}
+          <a href="/prompts/{{ info.id }}/version/{{ current_version }}/export?format={{ fmt }}"
+             class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{{ label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <!-- 삭제 -->
       <form method="post" action="/prompts/{{ info.id }}/delete"
-            onsubmit="return confirm('Permanently delete this prompt?')">
-        <button type="submit" class="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100">Delete</button>
+            onsubmit="return confirm('{{ info.id }}의 모든 버전({{ versions | length }}개)이 영구적으로 삭제됩니다. 계속하시겠습니까?')">
+        <button type="submit" class="px-3 py-1.5 text-sm bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100">삭제</button>
       </form>
     </div>
   </div>
 
-  <div class="grid grid-cols-3 gap-6">
+  <!-- Edit Info Modal -->
+  <div id="edit-info-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+    <div class="bg-white rounded-xl shadow-xl border border-gray-200 w-96 p-6 animate-fade-in">
+      <h3 class="text-lg font-semibold mb-4">Prompt 정보 수정</h3>
+      <form method="post" action="/prompts/{{ info.id }}/edit-info" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">설명</label>
+          <input type="text" name="description" value="{{ info.info.description or '' }}"
+                 class="w-full text-sm border rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">작성자</label>
+          <input type="text" name="author" value="{{ info.info.author or '' }}"
+                 class="w-full text-sm border rounded px-3 py-2">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="document.getElementById('edit-info-modal').classList.add('hidden')"
+                  class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200">취소</button>
+          <button type="submit" class="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Diff Modal -->
+  {% if versions | length > 1 %}
+  <div id="diff-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+    <div class="bg-white rounded-xl shadow-xl border border-gray-200 w-80 p-6 animate-fade-in space-y-4">
+      <h3 class="text-lg font-semibold">버전 비교</h3>
+      <form action="/prompts/{{ info.id }}/diff" method="get" class="space-y-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">비교 기준 (From)</label>
+          <select name="from" class="w-full text-sm border rounded px-3 py-2">
+            {% for ver in versions %}
+            <option value="{{ ver }}" {% if loop.index == versions|length - 1 %}selected{% endif %}>{{ ver }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">비교 대상 (To)</label>
+          <select name="to" class="w-full text-sm border rounded px-3 py-2">
+            {% for ver in versions %}
+            <option value="{{ ver }}" {% if loop.last %}selected{% endif %}>{{ ver }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="document.getElementById('diff-modal').classList.add('hidden')"
+                  class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200">취소</button>
+          <button type="submit" class="px-4 py-2 text-sm text-white bg-gray-700 rounded hover:bg-gray-800">비교하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <script>
+  document.getElementById('edit-info-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+  });
+  {% if versions | length > 1 %}
+  document.getElementById('diff-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+  });
+  {% endif %}
+  function toggleMetaPopover() {
+    document.getElementById('meta-popover').classList.toggle('hidden');
+  }
+  document.addEventListener('click', function(e) {
+    const btn = document.getElementById('meta-btn');
+    const pop = document.getElementById('meta-popover');
+    if (pop && btn && !btn.contains(e.target) && !pop.contains(e.target)) {
+      pop.classList.add('hidden');
+    }
+    const exportWrap = document.getElementById('export-wrap');
+    const exportMenu = document.getElementById('export-menu');
+    if (exportMenu && exportWrap && !exportWrap.contains(e.target)) {
+      exportMenu.classList.add('hidden');
+    }
+  });
+  </script>
+
+  <div class="grid grid-cols-4 gap-6 flex-1 min-h-0">
     <!-- Versions Sidebar -->
-    <div class="col-span-1 space-y-4">
+    <div class="col-span-1 flex flex-col gap-4 min-h-0 overflow-y-auto">
       <div class="bg-white rounded-lg shadow p-4">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">VERSIONS</h2>
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">버전 목록</h2>
         <ul class="space-y-1">
           {% for ver in versions | reverse %}
           <li>
@@ -35,11 +178,8 @@
                       {% if ver == current_version %}bg-green-50 text-green-700 font-medium{% else %}hover:bg-gray-50 text-gray-700{% endif %}">
               <span class="font-mono">{{ ver }}</span>
               <div class="flex gap-1">
-                {% if info.production and ver == info.production.version %}
-                  <span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700 text-xs">prod</span>
-                {% endif %}
                 {% if ver == info.latest_version %}
-                  <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">latest</span>
+                  <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">최신</span>
                 {% endif %}
               </div>
             </a>
@@ -48,117 +188,62 @@
         </ul>
       </div>
 
-      <!-- Deploy -->
-      <div class="bg-white rounded-lg shadow p-4">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">DEPLOY</h2>
-        <form method="post" action="/prompts/{{ info.id }}/deploy" class="space-y-2">
-          <select name="version" class="w-full text-sm border rounded px-3 py-2">
-            {% for ver in versions | reverse %}
-            <option value="{{ ver }}" {% if ver == current_version %}selected{% endif %}>{{ ver }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit" class="w-full px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">Deploy</button>
-        </form>
-      </div>
-
-      <!-- Update Version -->
-      <div class="bg-white rounded-lg shadow p-4">
-        <a href="/prompts/{{ info.id }}/update" class="block w-full px-3 py-2 text-sm text-center bg-blue-600 text-white rounded hover:bg-blue-700">New Version</a>
-      </div>
-
-      <!-- Diff -->
-      {% if versions | length > 1 %}
-      <div class="bg-white rounded-lg shadow p-4">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">DIFF</h2>
-        <form action="/prompts/{{ info.id }}/diff" method="get" class="space-y-2">
-          <select name="from" class="w-full text-sm border rounded px-3 py-2">
-            {% for ver in versions %}
-            <option value="{{ ver }}" {% if loop.index == versions|length - 1 %}selected{% endif %}>{{ ver }}</option>
-            {% endfor %}
-          </select>
-          <select name="to" class="w-full text-sm border rounded px-3 py-2">
-            {% for ver in versions %}
-            <option value="{{ ver }}" {% if loop.last %}selected{% endif %}>{{ ver }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit" class="w-full px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Diff</button>
-        </form>
-      </div>
-      {% endif %}
-
-      {% if prompt_data %}
-      <!-- Metadata -->
-      <div class="bg-white rounded-lg shadow p-4">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">METADATA</h2>
-        <div class="space-y-2 text-sm">
-          <div>
-            <span class="text-gray-500">Author</span>
-            <p class="mt-1">{{ prompt_data.metadata.author or '-' }}</p>
-          </div>
-          <div>
-            <span class="text-gray-500">Created</span>
-            <p class="mt-1">{{ prompt_data.metadata.created_at }}</p>
-          </div>
-          <div>
-            <span class="text-gray-500">Source File</span>
-            <p class="mt-1 font-mono text-xs break-all">{{ prompt_data.metadata.source_file }}</p>
-          </div>
-          <div>
-            <span class="text-gray-500">Checksum</span>
-            <div class="flex items-center gap-2 mt-1">
-              <span class="font-mono text-xs" title="{{ prompt_data.metadata.template_checksum }}">{{ prompt_data.metadata.template_checksum[:16] }}...</span>
-              <button onclick="copyText('{{ prompt_data.metadata.template_checksum }}', this)" class="text-xs text-green-600 hover:text-green-800">Copy</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- Prompt Content -->
-    <div class="col-span-2 space-y-4">
-      {% if prompt_data %}
-      <!-- Prompt Text -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-gray-500">PROMPT <span class="font-mono text-green-600">v{{ prompt_data.version }}</span></h2>
-          <button onclick="copyText(document.getElementById('prompt-text').textContent, this)" class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded bg-green-50 hover:bg-green-100">Copy</button>
-        </div>
-        <pre id="prompt-text" class="bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed" style="max-height: 250px; overflow-y: auto;">{{ prompt_data.prompt }}</pre>
-      </div>
 
       <!-- LLM Config -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">LLM CONFIG</h2>
-        <div class="grid grid-cols-2 gap-4 text-sm">
+      {% if prompt_data %}
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">LLM 설정</h2>
+        <div class="space-y-2 text-sm">
           {% for key, value in prompt_data.llm.items() %}
           <div>
-            <span class="text-gray-500">{{ key }}</span>
+            <span class="text-gray-400 text-xs">{{ key }}</span>
             {% if value is mapping %}
-            <pre class="mt-1 text-gray-900 font-mono text-xs bg-gray-50 rounded p-2">{{ value | tojson(indent=2) }}</pre>
+            <pre class="mt-0.5 text-gray-900 font-mono text-xs bg-gray-50 rounded p-2">{{ value | tojson(indent=2) }}</pre>
             {% else %}
-            <p class="mt-1 text-gray-900 font-mono">{{ value }}</p>
+            <p class="mt-0.5 text-gray-800 font-mono text-xs">{{ value }}</p>
             {% endif %}
           </div>
           {% endfor %}
         </div>
       </div>
+      {% endif %}
 
       <!-- Token Count -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-sm font-semibold text-gray-500 mb-3">TOKEN COUNT</h2>
+      {% if prompt_data %}
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">토큰 수</h2>
         <div class="space-y-3">
           <div>
-            <label class="text-xs text-gray-500">Model</label>
+            <label class="text-xs text-gray-500">모델</label>
             <select id="token-model-select" class="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-mono">
-              <option value="">Select a model...</option>
+              <option value="">모델 선택...</option>
             </select>
           </div>
           <div id="token-count-result" class="hidden">
-            <span class="text-gray-500 text-sm">Input Tokens</span>
+            <span class="text-gray-500 text-sm">입력 토큰</span>
             <p id="token-count-value" class="text-2xl font-bold font-mono text-green-600 mt-1"></p>
           </div>
         </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Prompt Content -->
+    <div class="col-span-3 flex flex-col min-h-0">
+      {% if prompt_data %}
+      <div class="bg-white rounded-lg shadow p-6 flex flex-col flex-1 min-h-0">
+        <div class="flex items-center justify-between mb-3 shrink-0">
+          <h2 class="text-sm font-semibold text-gray-500">PROMPT <span class="font-mono text-green-600">v{{ prompt_data.version }}</span></h2>
+          <div class="flex items-center gap-2">
+            {% if versions | length > 1 %}
+            <button onclick="document.getElementById('diff-modal').classList.remove('hidden')"
+                    class="text-sm text-gray-600 hover:text-gray-800 px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 border border-gray-200">버전 비교</button>
+            {% endif %}
+            <button onclick="copyText(document.getElementById('prompt-text').textContent, this)" class="text-sm text-green-600 hover:text-green-800 px-3 py-1.5 rounded bg-green-50 hover:bg-green-100">복사</button>
+          </div>
+        </div>
+        <pre id="prompt-text" class="flex-1 bg-gray-50 rounded p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed overflow-y-auto">{{ prompt_data.prompt }}</pre>
       </div>
       {% endif %}
     </div>

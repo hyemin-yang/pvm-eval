@@ -1,6 +1,39 @@
+/* Global type scale */
+body {
+  font-size: 20px;
+  line-height: 1.7;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.text-xs {
+  font-size: 1.05rem;
+}
+
+.text-sm {
+  font-size: 1.2rem;
+}
+
+.text-lg {
+  font-size: 1.5rem;
+}
+
+.text-xl {
+  font-size: 1.75rem;
+}
+
+.text-2xl {
+  font-size: 2.3rem;
+}
+
 /* diff2html overrides for better integration */
 .d2h-wrapper {
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .d2h-file-header {
@@ -17,11 +50,46 @@
 .badge-ver  { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
 
 /* Prompt content */
-.prompt-body { font-family: 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.prompt-body { font-family: 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 1.1rem; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
 
 /* Scrollable code blocks */
 .code-block { max-height: 400px; overflow-y: auto; }
 
+.tree-page {
+  min-height: 0;
+}
+
+.tree-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.tree-block {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+}
+
+/* Sidebar */
+.sidebar-nav-item {
+  font-size: 1.3rem;
+  font-weight: 500;
+}
+
+.sidebar-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
 /* Fade-in animation */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn 0.15s ease-out; }
+
+/* Popover fade-in */
+@keyframes popIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.animate-fade-in { animation: popIn 0.15s ease-out; }

@@ -13,7 +13,7 @@
   function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
       const orig = btn.textContent;
-      btn.textContent = 'Copied!';
+      btn.textContent = '복사됨!';
       setTimeout(() => btn.textContent = orig, 1500);
     });
   }
@@ -21,38 +21,35 @@
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex">
   <!-- Sidebar -->
-  <aside class="w-56 bg-gray-900 text-white min-h-screen fixed left-0 top-0 flex flex-col">
+  <aside class="w-64 bg-gray-900 text-white min-h-screen fixed left-0 top-0 flex flex-col">
     <div class="px-5 py-5">
-      <a href="/" class="text-xl font-bold text-green-400 tracking-tight">pvm</a>
-      <p class="text-gray-500 text-xs mt-1">prompt version manager</p>
+      <a href="/" class="text-2xl font-bold text-green-400 tracking-tight">pvm</a>
+      <p class="text-gray-500 text-sm mt-1">Prompt Version Manager</p>
     </div>
-    <nav class="flex-1 px-3 space-y-1">
-      <a href="/" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition">
-        <span>📊</span> Dashboard
+    <nav class="flex-1 px-4 space-y-1">
+      <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition sidebar-nav-item">
+        <span class="sidebar-icon">📊</span> Dashboard
       </a>
-      <a href="/prompts" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition">
-        <span>📝</span> Prompts
+      <a href="/prompts" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition sidebar-nav-item">
+        <span class="sidebar-icon">📝</span> Prompt
       </a>
-      <a href="/snapshots" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition">
-        <span>📦</span> Snapshots
-      </a>
-      <a href="/history" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition">
-        <span>📜</span> History
+<a href="/tree" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition sidebar-nav-item">
+        <span class="sidebar-icon">🌲</span> Tree
       </a>
     </nav>
-    <div class="px-3 pb-4">
-      <a href="/prompts/add" class="flex items-center justify-center gap-2 px-3 py-2.5 rounded border border-dashed border-gray-600 text-sm font-medium text-gray-400 hover:border-green-400 hover:text-green-400 transition">
-        + Add Prompt
+    <div class="px-4 pb-5">
+      <a href="/prompts/add" class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-gray-600 text-gray-400 hover:border-green-400 hover:text-green-400 transition sidebar-nav-item">
+        + Prompt 추가
       </a>
     </div>
-    <div class="px-5 py-3 text-xs text-gray-600 border-t border-gray-800">
+    <div class="px-6 py-3 text-xs text-gray-600 border-t border-gray-800">
       pvm local ui
     </div>
   </aside>
 
   <!-- Main Content -->
-  <main class="ml-56 flex-1 px-8 py-8 fade-in">
-    <div class="max-w-7xl mx-auto">
+  <main class="ml-64 flex-1 px-8 py-8 fade-in {% block main_class %}{% endblock %}">
+    <div class="max-w-7xl mx-auto {% block content_wrapper_class %}{% endblock %}">
       {% block content %}{% endblock %}
     </div>
   </main>

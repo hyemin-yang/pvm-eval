@@ -8,12 +8,12 @@
   <div class="bg-white rounded-lg shadow p-4">
     <form method="get" action="/history" class="flex items-center gap-4">
       <select name="id" class="text-sm border rounded px-3 py-2">
-        <option value="">All (Snapshot history)</option>
+        <option value="">Prompt 선택...</option>
         {% for pid in prompt_ids %}
         <option value="{{ pid }}" {% if selected_id == pid %}selected{% endif %}>{{ pid }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">Filter</button>
+      <button type="submit" class="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">필터</button>
     </form>
   </div>
 
@@ -23,15 +23,15 @@
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b">
         <tr>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Time</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Event</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">시간</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">이벤트</th>
           <th class="text-left px-6 py-3 font-medium text-gray-500">ID</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Details</th>
+          <th class="text-left px-6 py-3 font-medium text-gray-500">상세</th>
         </tr>
       </thead>
-      <tbody class="divide-y">
+      <tbody class="divide-y" id="history-tbody">
         {% for entry in history_entries | reverse %}
-        <tr class="hover:bg-gray-50">
+        <tr class="hover:bg-gray-50 history-row">
           <td class="px-6 py-3 text-gray-500 font-mono text-xs">{{ entry.ts }}</td>
           <td class="px-6 py-3">
             {% if entry.event == 'add' %}
@@ -49,13 +49,13 @@
           <td class="px-6 py-3 font-mono text-green-600">{{ entry.id or entry.version or '-' }}</td>
           <td class="px-6 py-3 text-gray-600 text-xs">
             {% if entry.event == 'add' %}
-              version {{ entry.version }}
+              버전 {{ entry.version }}
             {% elif entry.event == 'deploy' %}
               {{ entry.from_version or 'none' }} &rarr; {{ entry.to_version }}
             {% elif entry.event == 'rollback' %}
               {{ entry.from_version }} &rarr; {{ entry.to_version }}
             {% elif entry.event == 'create' %}
-              {{ entry.prompt_count }} prompts
+              {{ entry.prompt_count }}개 Prompt
             {% endif %}
           </td>
         </tr>
@@ -63,10 +63,50 @@
       </tbody>
     </table>
   </div>
+  <div id="history-pagination" class="mt-4"></div>
   {% else %}
   <div class="bg-white rounded-lg shadow p-12 text-center">
-    <p class="text-gray-400">No history entries</p>
+    <p class="text-gray-400">History가 없습니다</p>
   </div>
   {% endif %}
 </div>
+
+<script>
+const HIST_PAGE_SIZE = 15;
+let histPage = 0;
+
+function renderHistory() {
+  const rows = Array.from(document.querySelectorAll('#history-tbody .history-row'));
+  const start = histPage * HIST_PAGE_SIZE;
+  rows.forEach((el, i) => { el.style.display = (i >= start && i < start + HIST_PAGE_SIZE) ? '' : 'none'; });
+  renderHistPagination(rows.length);
+}
+
+function renderHistPagination(total) {
+  const totalPages = Math.ceil(total / HIST_PAGE_SIZE);
+  const container = document.getElementById('history-pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  const btnBase = 'px-3 py-1.5 text-sm rounded border';
+  let html = '<div class="flex items-center justify-center gap-2">';
+  html += `<button onclick="goHistPage(${histPage - 1})" ${histPage === 0 ? 'disabled' : ''}
+    class="${btnBase} ${histPage === 0 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50'}">이전</button>`;
+  for (let i = 0; i < totalPages; i++) {
+    html += `<button onclick="goHistPage(${i})"
+      class="${btnBase} ${i === histPage ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 hover:bg-gray-50'}">${i + 1}</button>`;
+  }
+  html += `<button onclick="goHistPage(${histPage + 1})" ${histPage === totalPages - 1 ? 'disabled' : ''}
+    class="${btnBase} ${histPage === totalPages - 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50'}">다음</button>`;
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function goHistPage(page) {
+  const total = document.querySelectorAll('#history-tbody .history-row').length;
+  histPage = Math.max(0, Math.min(page, Math.ceil(total / HIST_PAGE_SIZE) - 1));
+  renderHistory();
+}
+
+document.addEventListener('DOMContentLoaded', renderHistory);
+</script>
 {% endblock %}

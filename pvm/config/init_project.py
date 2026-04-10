@@ -51,6 +51,7 @@ def init_project(root: Path, name: str = DEFAULT_PROJECT_NAME) -> dict[str, str]
         {
             "project_id": project_id,
             "name": name,
+            "description": "",
             "created_at": created_at,
         },
     )
@@ -80,6 +81,7 @@ def init_project(root: Path, name: str = DEFAULT_PROJECT_NAME) -> dict[str, str]
     return {
         "project_id": project_id,
         "name": name,
+        "description": "",
         "created_at": created_at,
         "root": str(paths.root),
     }

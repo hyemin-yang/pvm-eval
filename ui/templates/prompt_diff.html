@@ -1,88 +1,114 @@
 {% extends "base.html" %}
-{% block title %}pvm - Diff {{ prompt_id }}{% endblock %}
+{% block title %}pvm - {{ prompt_id }} 비교{% endblock %}
 {% block content %}
-<div class="space-y-6">
-  <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold font-mono">{{ prompt_id }}</h1>
-      <p class="text-sm text-gray-500 mt-1">
-        Comparing <span class="font-mono font-medium">{{ diff_result.from_version }}</span>
-        &rarr; <span class="font-mono font-medium">{{ diff_result.to_version }}</span>
-      </p>
+<div class="space-y-5">
+
+  <!-- PR-style Header -->
+  <div class="bg-white rounded-xl shadow p-5">
+    <div class="flex items-start justify-between gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-3">
+          <a href="/prompts/{{ prompt_id }}" class="text-2xl font-bold font-mono text-gray-900 hover:text-green-600 transition">{{ prompt_id }}</a>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">버전 비교</span>
+        </div>
+        {% if diff_result.changed %}
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded bg-green-100 text-green-700 font-semibold font-mono text-sm">+{{ diff_result.lines_added }}</span>
+          <span class="px-2 py-0.5 rounded bg-red-100 text-red-700 font-semibold font-mono text-sm">-{{ diff_result.lines_removed }}</span>
+          {% if diff_result.model_config_changed %}
+          <span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium border border-yellow-200">모델 설정 변경</span>
+          {% endif %}
+        </div>
+        {% else %}
+        <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs border border-gray-200">변경 없음</span>
+        {% endif %}
+      </div>
+      <a href="/prompts/{{ prompt_id }}" class="shrink-0 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; 돌아가기</a>
     </div>
-    <a href="/prompts/{{ prompt_id }}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; Back</a>
   </div>
 
-  <!-- Summary Bar -->
-  <div class="bg-white rounded-lg shadow p-4 flex items-center gap-6 text-sm">
-    {% if diff_result.changed %}
-    <div class="flex items-center gap-2">
-      <span class="w-3 h-3 rounded-full bg-green-400"></span>
-      <span class="text-green-700 font-medium">+{{ diff_result.lines_added }} lines</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <span class="w-3 h-3 rounded-full bg-red-400"></span>
-      <span class="text-red-700 font-medium">-{{ diff_result.lines_removed }} lines</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <span class="text-gray-500">Length delta:</span>
-      <span class="font-mono">{{ diff_result.prompt_length_delta }}</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <span class="text-gray-500">Model config:</span>
-      {% if diff_result.model_config_changed %}
-        <span class="px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 text-xs font-medium">changed</span>
-      {% else %}
-        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">unchanged</span>
-      {% endif %}
-    </div>
+  <!-- Version Selector + View Toggle -->
+  <div class="flex items-center justify-between gap-4">
+    {% if versions | length > 1 %}
+    <form action="/prompts/{{ prompt_id }}/diff" method="get" class="flex items-center gap-2">
+      <select name="from" class="text-sm border rounded px-3 py-1.5 bg-white font-mono">
+        {% for ver in versions %}
+        <option value="{{ ver }}" {% if ver == diff_result.from_version %}selected{% endif %}>{{ ver }}</option>
+        {% endfor %}
+      </select>
+      <span class="text-gray-400 text-sm">→</span>
+      <select name="to" class="text-sm border rounded px-3 py-1.5 bg-white font-mono">
+        {% for ver in versions %}
+        <option value="{{ ver }}" {% if ver == diff_result.to_version %}selected{% endif %}>{{ ver }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="px-3 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-900">비교</button>
+    </form>
     {% else %}
-    <span class="text-gray-500">No changes</span>
+    <div></div>
+    {% endif %}
+
+    {% if diff_result.changed %}
+    <div class="flex border rounded overflow-hidden text-sm">
+      <button id="btn-split" onclick="setView('side-by-side')"
+              class="px-3 py-1.5 bg-gray-800 text-white transition">Split</button>
+      <button id="btn-unified" onclick="setView('line-by-line')"
+              class="px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 transition">Unified</button>
+    </div>
     {% endif %}
   </div>
 
   <!-- Diff View -->
   {% if diff_result.changed %}
-  <div class="bg-white rounded-lg shadow p-6">
-    <div id="diff-view"></div>
+  <div class="bg-white rounded-xl shadow overflow-hidden">
+    <!-- File header (GitHub style) -->
+    <div class="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <span class="text-sm font-mono text-gray-700">{{ prompt_id }} / prompt</span>
+      <span class="ml-auto text-xs text-gray-400">
+        <span class="text-green-600 font-semibold">+{{ diff_result.lines_added }}</span>
+        <span class="text-red-500 font-semibold ml-1">-{{ diff_result.lines_removed }}</span>
+      </span>
+    </div>
+    <div id="diff-view" class="overflow-x-auto"></div>
   </div>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const diffString = {{ diff_result.unified_diff | tojson }};
-      const targetElement = document.getElementById("diff-view");
-      const configuration = {
-        drawFileList: false,
-        matching: "lines",
-        outputFormat: "side-by-side",
-        highlight: true,
-        renderNothingWhenEmpty: false,
-      };
-      const diff2htmlUi = new Diff2HtmlUI(targetElement, diffString, configuration, {});
-      diff2htmlUi.draw();
-    });
-  </script>
-  {% endif %}
-
-  <!-- Diff Other Versions -->
-  {% if versions | length > 1 %}
-  <div class="bg-white rounded-lg shadow p-4">
-    <h2 class="text-sm font-semibold text-gray-500 mb-3">DIFF OTHER VERSIONS</h2>
-    <form action="/prompts/{{ prompt_id }}/diff" method="get" class="flex items-center gap-4">
-      <select name="from" class="text-sm border rounded px-3 py-2">
-        {% for ver in versions %}
-        <option value="{{ ver }}" {% if ver == diff_result.from_version %}selected{% endif %}>{{ ver }}</option>
-        {% endfor %}
-      </select>
-      <span class="text-gray-400">&rarr;</span>
-      <select name="to" class="text-sm border rounded px-3 py-2">
-        {% for ver in versions %}
-        <option value="{{ ver }}" {% if ver == diff_result.to_version %}selected{% endif %}>{{ ver }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Diff</button>
-    </form>
+  {% else %}
+  <div class="bg-white rounded-xl shadow p-12 text-center">
+    <p class="text-gray-400">두 버전 사이에 변경 사항이 없습니다.</p>
   </div>
   {% endif %}
+
 </div>
+
+{% if diff_result.changed %}
+<script>
+let currentView = 'side-by-side';
+let currentDiff = {{ diff_result.unified_diff | tojson }};
+
+function renderDiff(outputFormat) {
+  const targetElement = document.getElementById("diff-view");
+  const configuration = {
+    drawFileList: false,
+    matching: "lines",
+    outputFormat: outputFormat,
+    highlight: true,
+    renderNothingWhenEmpty: false,
+  };
+  targetElement.innerHTML = '';
+  const diff2htmlUi = new Diff2HtmlUI(targetElement, currentDiff, configuration, {});
+  diff2htmlUi.draw();
+}
+
+function setView(view) {
+  currentView = view;
+  renderDiff(view);
+  document.getElementById('btn-split').className   = 'px-3 py-1.5 transition ' + (view === 'side-by-side' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50');
+  document.getElementById('btn-unified').className = 'px-3 py-1.5 transition ' + (view === 'line-by-line'  ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50');
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  renderDiff('side-by-side');
+});
+</script>
+{% endif %}
 {% endblock %}

@@ -1,38 +1,38 @@
 {% extends "base.html" %}
-{% block title %}pvm - Snapshot Diff{% endblock %}
+{% block title %}pvm - Snapshot 비교{% endblock %}
 {% block content %}
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold">Snapshot Diff</h1>
+      <h1 class="text-2xl font-bold">Snapshot 비교</h1>
       <p class="text-sm text-gray-500 mt-1">
         <span class="font-mono font-medium">{{ diff_result.from_version }}</span>
         &rarr; <span class="font-mono font-medium">{{ diff_result.to_version }}</span>
       </p>
     </div>
-    <a href="/snapshots" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; Back</a>
+    <a href="/snapshots" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">&larr; 돌아가기</a>
   </div>
 
   <!-- Summary -->
   <div class="grid grid-cols-3 gap-4">
     <div class="bg-white rounded-lg shadow p-4 text-center">
       <span class="text-3xl font-bold text-green-600">{{ diff_result.added_ids | length }}</span>
-      <p class="text-sm text-gray-500 mt-1">Added</p>
+      <p class="text-sm text-gray-500 mt-1">추가됨</p>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
       <span class="text-3xl font-bold text-red-600">{{ diff_result.removed_ids | length }}</span>
-      <p class="text-sm text-gray-500 mt-1">Removed</p>
+      <p class="text-sm text-gray-500 mt-1">제거됨</p>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
       <span class="text-3xl font-bold text-yellow-600">{{ diff_result.changed_ids | length }}</span>
-      <p class="text-sm text-gray-500 mt-1">Changed</p>
+      <p class="text-sm text-gray-500 mt-1">변경됨</p>
     </div>
   </div>
 
   <!-- Added -->
   {% if diff_result.added_ids %}
   <div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-sm font-semibold text-green-600 mb-3">ADDED</h2>
+    <h2 class="text-sm font-semibold text-green-600 mb-3">추가됨</h2>
     <ul class="space-y-2">
       {% for id in diff_result.added_ids %}
       <li class="flex items-center gap-2 text-sm">
@@ -47,7 +47,7 @@
   <!-- Removed -->
   {% if diff_result.removed_ids %}
   <div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-sm font-semibold text-red-600 mb-3">REMOVED</h2>
+    <h2 class="text-sm font-semibold text-red-600 mb-3">제거됨</h2>
     <ul class="space-y-2">
       {% for id in diff_result.removed_ids %}
       <li class="flex items-center gap-2 text-sm">
@@ -62,7 +62,7 @@
   <!-- Changed -->
   {% if diff_result.changed_ids %}
   <div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-sm font-semibold text-yellow-600 mb-3">CHANGED</h2>
+    <h2 class="text-sm font-semibold text-yellow-600 mb-3">변경됨</h2>
     <ul class="space-y-2">
       {% for item in diff_result.changed_ids %}
       <li class="flex items-center justify-between text-sm">
@@ -81,14 +81,14 @@
 
   {% if not diff_result.added_ids and not diff_result.removed_ids and not diff_result.changed_ids %}
   <div class="bg-white rounded-lg shadow p-12 text-center">
-    <p class="text-gray-400">No differences between these snapshots</p>
+    <p class="text-gray-400">두 Snapshot 간 차이가 없습니다</p>
   </div>
   {% endif %}
 
   <!-- Diff Other -->
   {% if snapshots | length > 1 %}
   <div class="bg-white rounded-lg shadow p-4">
-    <h2 class="text-sm font-semibold text-gray-500 mb-3">DIFF OTHER VERSIONS</h2>
+    <h2 class="text-sm font-semibold text-gray-500 mb-3">다른 버전 비교</h2>
     <form action="/snapshots/diff/compare" method="get" class="flex items-center gap-4">
       <select name="from" class="text-sm border rounded px-3 py-2">
         {% for ver in snapshots %}
@@ -101,7 +101,7 @@
         <option value="{{ ver }}" {% if ver == diff_result.to_version %}selected{% endif %}>{{ ver }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Diff</button>
+      <button type="submit" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">비교하기</button>
     </form>
   </div>
   {% endif %}

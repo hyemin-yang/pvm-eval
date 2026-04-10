@@ -1,115 +1,318 @@
 {% extends "base.html" %}
-{% block title %}pvm - Prompts{% endblock %}
+{% block title %}pvm - Prompt{% endblock %}
 {% block content %}
 <div class="space-y-6">
   <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold">Prompts</h1>
-    <a href="/prompts/add" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">+ Add Prompt</a>
+    <h1 class="text-2xl font-bold">Prompt</h1>
+    <div class="flex items-center gap-2">
+      <button onclick="document.getElementById('compare-modal').classList.remove('hidden')"
+              class="px-4 py-2 text-sm bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-gray-200">버전 비교</button>
+      <a href="/prompts/add" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">+ Prompt 추가</a>
+    </div>
+  </div>
+
+  <!-- Compare Modal -->
+  <div id="compare-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+    <div class="bg-white rounded-xl shadow-xl border border-gray-200 w-96 p-6 animate-fade-in space-y-4">
+      <h3 class="text-lg font-semibold">버전 비교</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Prompt</label>
+          <select id="cmp-prompt" onchange="onCmpPromptChange()" class="w-full text-sm border rounded px-3 py-2">
+            <option value="">선택하세요</option>
+            {% for p in prompts_summary %}
+            {% if p.versions | length > 1 %}
+            <option value="{{ p.id }}" data-versions="{{ p.versions | join(',') }}">{{ p.id }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">From</label>
+          <select id="cmp-from" class="w-full text-sm border rounded px-3 py-2" disabled>
+            <option value="">-</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">To</label>
+          <select id="cmp-to" class="w-full text-sm border rounded px-3 py-2" disabled>
+            <option value="">-</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="document.getElementById('compare-modal').classList.add('hidden')"
+                class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200">취소</button>
+        <button type="button" onclick="goCompare()"
+                class="px-4 py-2 text-sm text-white bg-gray-700 rounded hover:bg-gray-800">비교하기</button>
+      </div>
+    </div>
   </div>
 
   {% if prompts_summary %}
-  <!-- Search -->
+  <!-- Search + View Toggle -->
   <div class="bg-white rounded-lg shadow p-4 space-y-3">
-    <input type="text" id="prompt-search" placeholder="Search all..."
-           oninput="filterAll()"
-           class="w-full text-sm border rounded px-4 py-2">
+    <div class="flex items-center gap-3">
+      <input type="text" id="prompt-search" placeholder="전체 검색..."
+             oninput="filterAll()"
+             class="flex-1 text-sm border rounded px-4 py-2">
+      <!-- View Toggle -->
+      <div class="flex border rounded overflow-hidden">
+        <button onclick="switchView('gallery')" id="view-gallery"
+                class="px-3 py-2 text-sm bg-green-600 text-white transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+        </button>
+        <button onclick="switchView('list')" id="view-list"
+                class="px-3 py-2 text-sm bg-white text-gray-500 hover:bg-gray-50 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
     <div class="flex items-center gap-2">
       <button onclick="toggleAdvanced()" id="advanced-toggle"
-              class="text-xs text-green-600 hover:underline">Advanced Search</button>
+              class="text-xs text-green-600 hover:underline">상세 검색</button>
     </div>
     <div id="advanced-panel" class="hidden grid grid-cols-3 gap-3">
       <div>
         <label class="block text-xs text-gray-500 mb-1">ID</label>
-        <input type="text" id="filter-id" oninput="filterAll()" placeholder="e.g. intent"
+        <input type="text" id="filter-id" oninput="filterAll()" placeholder="예: intent"
                class="w-full text-xs font-mono border rounded px-3 py-1.5">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Author</label>
-        <input type="text" id="filter-author" oninput="filterAll()" placeholder="e.g. alice"
+        <label class="block text-xs text-gray-500 mb-1">작성자</label>
+        <input type="text" id="filter-author" oninput="filterAll()" placeholder="예: alice"
                class="w-full text-xs border rounded px-3 py-1.5">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">Status</label>
-        <select id="filter-status" onchange="filterAll()"
-                class="w-full text-xs border rounded px-3 py-1.5">
-          <option value="">All</option>
-          <option value="deployed">Deployed</option>
-          <option value="not-deployed">Not Deployed</option>
-        </select>
       </div>
     </div>
   </div>
-  {% endif %}
 
-  {% if prompts_summary %}
-  <div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="w-full text-sm">
-      <thead class="bg-gray-50 border-b">
-        <tr>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">ID</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Author</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Versions</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Latest</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Production</th>
-          <th class="text-left px-6 py-3 font-medium text-gray-500">Created</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y">
-        {% for p in prompts_summary %}
-        <tr class="hover:bg-gray-50 cursor-pointer"
-            onclick="window.location='/prompts/{{ p.id }}'"
-            data-id="{{ p.id }}"
-            data-author="{{ p.info.author or '' }}"
-            data-status="{{ 'deployed' if p.production else 'not-deployed' }}">
-          <td class="px-6 py-4 font-mono text-green-600">{{ p.id }}</td>
-          <td class="px-6 py-4 text-gray-600">{{ p.info.author or '-' }}</td>
-          <td class="px-6 py-4">{{ p.versions | length }}</td>
-          <td class="px-6 py-4 font-mono">{{ p.latest_version }}</td>
-          <td class="px-6 py-4">
-            {% if p.production %}
-              <span class="px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-medium">v{{ p.production.version }}</span>
-            {% else %}
-              <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">-</span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-gray-500">{{ p.info.created_at }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <!-- List View -->
+  <div id="panel-list" class="hidden">
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+          <tr>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">ID</th>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">작성자</th>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">버전</th>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">최신</th>
+            <th class="text-left px-6 py-3 font-medium text-gray-500">생성일</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {% for p in prompts_summary %}
+          <tr class="hover:bg-gray-50 cursor-pointer prompt-item"
+              onclick="window.location='/prompts/{{ p.id }}'"
+              data-id="{{ p.id }}"
+              data-author="{{ p.info.author or '' }}">
+            <td class="px-6 py-4 font-mono text-green-600">{{ p.id }}</td>
+            <td class="px-6 py-4 text-gray-600">{{ p.info.author or '-' }}</td>
+            <td class="px-6 py-4">{{ p.versions | length }}</td>
+            <td class="px-6 py-4 font-mono">{{ p.latest_version }}</td>
+            <td class="px-6 py-4 text-gray-500">{{ p.info.created_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
+
+  <!-- Gallery View -->
+  <div id="panel-gallery">
+    <div class="grid grid-cols-5 gap-4 content-start" id="gallery-grid">
+      {% for p in prompts_summary %}
+      <div class="relative aspect-square bg-white rounded-xl border border-gray-200 hover:border-green-400 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden group prompt-item"
+           data-id="{{ p.id }}"
+           data-author="{{ p.info.author or '' }}"
+           onclick="if(!event.target.closest('[data-ver]'))location.href='/prompts/{{ p.id }}'">
+        <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+        <div class="p-5">
+          <div class="flex items-start justify-between mb-3">
+            <a href="/prompts/{{ p.id }}" class="font-mono text-base font-bold text-gray-800 group-hover:text-green-600 transition truncate">{{ p.id }}</a>
+          </div>
+          {% if p.info.description %}
+          <p class="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">{{ p.info.description }}</p>
+          {% else %}
+          <p class="text-sm text-gray-300 italic mb-4">설명 없음</p>
+          {% endif %}
+          <div class="flex items-center gap-3 text-xs text-gray-400 mb-4">
+            <span class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+              {{ p.versions | length }}개 버전
+            </span>
+            {% if p.info.author %}
+            <span class="flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              {{ p.info.author }}
+            </span>
+            {% endif %}
+          </div>
+          <div class="pt-3 border-t border-gray-100">
+            <div class="flex flex-wrap gap-1.5">
+              {% for ver in p.versions | reverse %}
+              <a href="/prompts/{{ p.id }}/version/{{ ver }}" data-ver
+                 class="px-2 py-0.5 rounded-md text-xs font-mono transition-all duration-150 bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100 hover:text-gray-600 hover:border-gray-300">{{ ver }}</a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div id="gallery-pagination" class="mt-6"></div>
+
   {% else %}
   <div class="bg-white rounded-lg shadow p-12 text-center">
-    <p class="text-gray-400 mb-4">No prompts yet</p>
-    <a href="/prompts/add" class="text-green-600 hover:underline">Add your first prompt</a>
+    <p class="text-gray-400 mb-4">Prompt가 없습니다</p>
+    <a href="/prompts/add" class="text-green-600 hover:underline">첫 Prompt 추가하기</a>
   </div>
   {% endif %}
 </div>
 
 <script>
+const PAGE_SIZE = 10;
+let currentPage = 0;
+
 function toggleAdvanced() {
   document.getElementById('advanced-panel').classList.toggle('hidden');
 }
 
-function filterAll() {
+function switchView(view) {
+  const listBtn = document.getElementById('view-list');
+  const galleryBtn = document.getElementById('view-gallery');
+  const listPanel = document.getElementById('panel-list');
+  const galleryPanel = document.getElementById('panel-gallery');
+
+  if (view === 'list') {
+    listPanel.classList.remove('hidden');
+    galleryPanel.classList.add('hidden');
+    listBtn.className = 'px-3 py-2 text-sm bg-green-600 text-white transition';
+    galleryBtn.className = 'px-3 py-2 text-sm bg-white text-gray-500 hover:bg-gray-50 transition';
+  } else {
+    listPanel.classList.add('hidden');
+    galleryPanel.classList.remove('hidden');
+    galleryBtn.className = 'px-3 py-2 text-sm bg-green-600 text-white transition';
+    listBtn.className = 'px-3 py-2 text-sm bg-white text-gray-500 hover:bg-gray-50 transition';
+  }
+}
+
+function getQueryParams() {
   const globalQ = (document.getElementById('prompt-search').value || '').toLowerCase();
   const idQ = (document.getElementById('filter-id')?.value || '').toLowerCase();
   const authorQ = (document.getElementById('filter-author')?.value || '').toLowerCase();
-  const statusQ = (document.getElementById('filter-status')?.value || '');
+  return { globalQ, idQ, authorQ };
+}
 
-  document.querySelectorAll('tbody tr').forEach(row => {
-    const text = row.textContent.toLowerCase();
-    const id = (row.dataset.id || '').toLowerCase();
-    const author = (row.dataset.author || '').toLowerCase();
-    const status = row.dataset.status || '';
+function matchesFilter(el, { globalQ, idQ, authorQ }) {
+  const text = el.textContent.toLowerCase();
+  const id = (el.dataset.id || '').toLowerCase();
+  const author = (el.dataset.author || '').toLowerCase();
+  return (!globalQ || text.includes(globalQ))
+      && (!idQ || id.includes(idQ))
+      && (!authorQ || author.includes(authorQ));
+}
 
-    const matchGlobal = !globalQ || text.includes(globalQ);
-    const matchId = !idQ || id.includes(idQ);
-    const matchAuthor = !authorQ || author.includes(authorQ);
-    const matchStatus = !statusQ || status === statusQ;
+function renderGallery() {
+  const params = getQueryParams();
+  const all = Array.from(document.querySelectorAll('#gallery-grid .prompt-item'));
+  const filtered = all.filter(el => matchesFilter(el, params));
+  const start = currentPage * PAGE_SIZE;
+  const pageSet = new Set(filtered.slice(start, start + PAGE_SIZE));
 
-    row.style.display = (matchGlobal && matchId && matchAuthor && matchStatus) ? '' : 'none';
+  all.forEach(el => { el.style.display = pageSet.has(el) ? '' : 'none'; });
+  renderPagination(filtered.length);
+}
+
+function renderPagination(total) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const container = document.getElementById('gallery-pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  const btnBase = 'px-3 py-1.5 text-sm rounded border';
+  let html = '<div class="flex items-center justify-center gap-2">';
+  html += `<button onclick="goPage(${currentPage - 1})" ${currentPage === 0 ? 'disabled' : ''}
+    class="${btnBase} ${currentPage === 0 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50'}">이전</button>`;
+
+  for (let i = 0; i < totalPages; i++) {
+    html += `<button onclick="goPage(${i})"
+      class="${btnBase} ${i === currentPage ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 hover:bg-gray-50'}">${i + 1}</button>`;
+  }
+
+  html += `<button onclick="goPage(${currentPage + 1})" ${currentPage === totalPages - 1 ? 'disabled' : ''}
+    class="${btnBase} ${currentPage === totalPages - 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50'}">다음</button>`;
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function goPage(page) {
+  const params = getQueryParams();
+  const all = Array.from(document.querySelectorAll('#gallery-grid .prompt-item'));
+  const filtered = all.filter(el => matchesFilter(el, params));
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  currentPage = Math.max(0, Math.min(page, totalPages - 1));
+  renderGallery();
+}
+
+function filterAll() {
+  currentPage = 0;
+  renderGallery();
+
+  // 리스트 뷰 필터
+  const params = getQueryParams();
+  document.querySelectorAll('#panel-list .prompt-item').forEach(el => {
+    el.style.display = matchesFilter(el, params) ? '' : 'none';
   });
+}
+
+function fixGalleryMinHeight() {
+  const grid = document.getElementById('gallery-grid');
+  const card = grid.querySelector('.prompt-item');
+  if (!card) return;
+  const h = card.offsetHeight;
+  const gap = 16; // gap-4 = 1rem = 16px
+  grid.style.minHeight = (h * 2 + gap) + 'px';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderGallery();
+  fixGalleryMinHeight();
+});
+window.addEventListener('resize', fixGalleryMinHeight);
+
+// Compare modal
+document.getElementById('compare-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
+function onCmpPromptChange() {
+  const sel = document.getElementById('cmp-prompt');
+  const fromSel = document.getElementById('cmp-from');
+  const toSel = document.getElementById('cmp-to');
+  const opt = sel.options[sel.selectedIndex];
+  const versions = opt.dataset.versions ? opt.dataset.versions.split(',') : [];
+
+  [fromSel, toSel].forEach(s => {
+    s.innerHTML = '';
+    s.disabled = versions.length === 0;
+    versions.forEach((v, i) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      s.appendChild(o);
+    });
+  });
+  if (versions.length >= 2) {
+    fromSel.selectedIndex = versions.length - 2;
+    toSel.selectedIndex = versions.length - 1;
+  }
+}
+
+function goCompare() {
+  const id = document.getElementById('cmp-prompt').value;
+  const from = document.getElementById('cmp-from').value;
+  const to = document.getElementById('cmp-to').value;
+  if (!id || !from || !to) return;
+  window.location.href = `/prompts/${id}/diff?from=${from}&to=${to}`;
 }
 </script>
 {% endblock %}
