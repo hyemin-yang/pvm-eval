@@ -83,15 +83,6 @@
         <input type="text" id="filter-author" oninput="filterAll()" placeholder="예: alice"
                class="w-full text-xs border rounded px-3 py-1.5">
       </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">상태</label>
-        <select id="filter-status" onchange="filterAll()"
-                class="w-full text-xs border rounded px-3 py-1.5">
-          <option value="">전체</option>
-          <option value="deployed">배포됨</option>
-          <option value="not-deployed">미배포</option>
-        </select>
-      </div>
     </div>
   </div>
 
@@ -105,7 +96,6 @@
             <th class="text-left px-6 py-3 font-medium text-gray-500">작성자</th>
             <th class="text-left px-6 py-3 font-medium text-gray-500">버전</th>
             <th class="text-left px-6 py-3 font-medium text-gray-500">최신</th>
-            <th class="text-left px-6 py-3 font-medium text-gray-500">운영</th>
             <th class="text-left px-6 py-3 font-medium text-gray-500">생성일</th>
           </tr>
         </thead>
@@ -114,19 +104,11 @@
           <tr class="hover:bg-gray-50 cursor-pointer prompt-item"
               onclick="window.location='/prompts/{{ p.id }}'"
               data-id="{{ p.id }}"
-              data-author="{{ p.info.author or '' }}"
-              data-status="{{ 'deployed' if p.production else 'not-deployed' }}">
+              data-author="{{ p.info.author or '' }}">
             <td class="px-6 py-4 font-mono text-green-600">{{ p.id }}</td>
             <td class="px-6 py-4 text-gray-600">{{ p.info.author or '-' }}</td>
             <td class="px-6 py-4">{{ p.versions | length }}</td>
             <td class="px-6 py-4 font-mono">{{ p.latest_version }}</td>
-            <td class="px-6 py-4">
-              {% if p.production %}
-                <span class="px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-medium">v{{ p.production.version }}</span>
-              {% else %}
-                <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">-</span>
-              {% endif %}
-            </td>
             <td class="px-6 py-4 text-gray-500">{{ p.info.created_at }}</td>
           </tr>
           {% endfor %}
@@ -137,22 +119,16 @@
 
   <!-- Gallery View -->
   <div id="panel-gallery">
-    <div class="grid grid-cols-5 gap-4" id="gallery-grid">
+    <div class="grid grid-cols-5 gap-4 content-start" id="gallery-grid">
       {% for p in prompts_summary %}
       <div class="relative aspect-square bg-white rounded-xl border border-gray-200 hover:border-green-400 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden group prompt-item"
            data-id="{{ p.id }}"
            data-author="{{ p.info.author or '' }}"
-           data-status="{{ 'deployed' if p.production else 'not-deployed' }}"
            onclick="if(!event.target.closest('[data-ver]'))location.href='/prompts/{{ p.id }}'">
-        <div class="h-1 {% if p.production %}bg-gradient-to-r from-green-400 to-emerald-500{% else %}bg-gradient-to-r from-gray-300 to-gray-400{% endif %}"></div>
+        <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
         <div class="p-5">
           <div class="flex items-start justify-between mb-3">
             <a href="/prompts/{{ p.id }}" class="font-mono text-base font-bold text-gray-800 group-hover:text-green-600 transition truncate">{{ p.id }}</a>
-            {% if p.production %}
-              <span class="shrink-0 ml-2 px-2.5 py-1 rounded-full bg-green-50 text-green-600 text-xs font-semibold border border-green-200">prod v{{ p.production.version }}</span>
-            {% else %}
-              <span class="shrink-0 ml-2 px-2.5 py-1 rounded-full bg-gray-50 text-gray-400 text-xs border border-gray-200">미배포</span>
-            {% endif %}
           </div>
           {% if p.info.description %}
           <p class="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">{{ p.info.description }}</p>
@@ -175,9 +151,7 @@
             <div class="flex flex-wrap gap-1.5">
               {% for ver in p.versions | reverse %}
               <a href="/prompts/{{ p.id }}/version/{{ ver }}" data-ver
-                 class="px-2 py-0.5 rounded-md text-xs font-mono transition-all duration-150
-                 {% if p.production and ver == p.production.version %}bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 hover:border-green-300
-                 {% else %}bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100 hover:text-gray-600 hover:border-gray-300{% endif %}">{{ ver }}</a>
+                 class="px-2 py-0.5 rounded-md text-xs font-mono transition-all duration-150 bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100 hover:text-gray-600 hover:border-gray-300">{{ ver }}</a>
               {% endfor %}
             </div>
           </div>
@@ -185,8 +159,8 @@
       </div>
       {% endfor %}
     </div>
-    <div id="gallery-pagination" class="mt-6"></div>
   </div>
+  <div id="gallery-pagination" class="mt-6"></div>
 
   {% else %}
   <div class="bg-white rounded-lg shadow p-12 text-center">
@@ -227,19 +201,16 @@ function getQueryParams() {
   const globalQ = (document.getElementById('prompt-search').value || '').toLowerCase();
   const idQ = (document.getElementById('filter-id')?.value || '').toLowerCase();
   const authorQ = (document.getElementById('filter-author')?.value || '').toLowerCase();
-  const statusQ = (document.getElementById('filter-status')?.value || '');
-  return { globalQ, idQ, authorQ, statusQ };
+  return { globalQ, idQ, authorQ };
 }
 
-function matchesFilter(el, { globalQ, idQ, authorQ, statusQ }) {
+function matchesFilter(el, { globalQ, idQ, authorQ }) {
   const text = el.textContent.toLowerCase();
   const id = (el.dataset.id || '').toLowerCase();
   const author = (el.dataset.author || '').toLowerCase();
-  const status = el.dataset.status || '';
   return (!globalQ || text.includes(globalQ))
       && (!idQ || id.includes(idQ))
-      && (!authorQ || author.includes(authorQ))
-      && (!statusQ || status === statusQ);
+      && (!authorQ || author.includes(authorQ));
 }
 
 function renderGallery() {
@@ -294,7 +265,20 @@ function filterAll() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', renderGallery);
+function fixGalleryMinHeight() {
+  const grid = document.getElementById('gallery-grid');
+  const card = grid.querySelector('.prompt-item');
+  if (!card) return;
+  const h = card.offsetHeight;
+  const gap = 16; // gap-4 = 1rem = 16px
+  grid.style.minHeight = (h * 2 + gap) + 'px';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderGallery();
+  fixGalleryMinHeight();
+});
+window.addEventListener('resize', fixGalleryMinHeight);
 
 // Compare modal
 document.getElementById('compare-modal').addEventListener('click', function(e) {

@@ -30,31 +30,11 @@
             <div id="tree-{{ p.id }}" class="hidden ml-6">
               {% for ver in p.versions %}
               <a href="/prompts/{{ p.id }}/version/{{ ver }}"
-                 class="block hover:underline {% if p.production and ver == p.production.version %}text-green-400 font-semibold{% else %}text-gray-400 hover:text-gray-200{% endif %}">
-                {% if p.production and ver == p.production.version %}* {% endif %}{{ ver }}{% if p.production and ver == p.production.version %} (prod){% endif %}
+                 class="block text-gray-400 hover:text-gray-200 hover:underline">
+                {{ ver }}
               </a>
               {% endfor %}
             </div>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="ml-4 text-gray-500 italic">비어있음</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Snapshots Panel -->
-    <div class="flex-1 rounded-lg shadow overflow-hidden flex flex-col bg-gray-900 min-h-0">
-      <div class="bg-gray-800 px-4 py-2 shrink-0 flex items-center gap-2">
-        <span class="text-sm font-semibold text-gray-400">Snapshots</span>
-        <span class="text-xs text-gray-600">({{ snapshots | length }})</span>
-      </div>
-      <div class="flex-1 overflow-y-auto p-5 font-mono text-sm leading-loose">
-        <div class="text-green-400 font-semibold">.pvm/snapshots/</div>
-        {% if snapshots %}
-          {% for ver in snapshots | reverse %}
-          <div class="ml-4 mt-1">
-            <a href="/snapshots/{{ ver }}" class="text-blue-400 hover:underline">{{ ver }}</a>
           </div>
           {% endfor %}
         {% else %}

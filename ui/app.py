@@ -300,17 +300,69 @@ def token_count_api(prompt_id: str, version: str, model: str = Query(...)):
     return JSONResponse(content=project.count_tokens(prompt_id, version, model))
 
 
+@app.get("/prompts/{prompt_id}/version/{version}/export")
+def prompt_export(prompt_id: str, version: str, fmt: str = Query("txt", alias="format")):
+    import json as _json
+    import yaml as _yaml
+    from fastapi.responses import Response
+
+    project = get_project()
+    d = project.get_prompt(prompt_id, version=version)
+    meta = d.get("metadata", {})
+
+    if fmt == "txt":
+        content = d["prompt"]
+        media_type = "text/plain; charset=utf-8"
+        filename = f"{prompt_id}_v{version}.txt"
+
+    elif fmt == "md":
+        lines = [f"# {prompt_id}", "", f"**버전**: `{version}`"]
+        if meta.get("author"):
+            lines.append(f"**작성자**: {meta['author']}")
+        if meta.get("created_at"):
+            lines.append(f"**생성일**: {meta['created_at']}")
+        lines += ["", "---", "", "## Prompt", "", d["prompt"]]
+        if d.get("llm"):
+            lines += ["", "## LLM 설정", "", "```json",
+                      _json.dumps(d["llm"], ensure_ascii=False, indent=2), "```"]
+        content = "\n".join(lines)
+        media_type = "text/markdown; charset=utf-8"
+        filename = f"{prompt_id}_v{version}.md"
+
+    elif fmt == "json":
+        content = _json.dumps(d, ensure_ascii=False, indent=2)
+        media_type = "application/json; charset=utf-8"
+        filename = f"{prompt_id}_v{version}.json"
+
+    elif fmt == "yaml":
+        template: dict = {"id": prompt_id, "prompt": d["prompt"]}
+        if d.get("llm"):
+            template["llm"] = d["llm"]
+        if meta.get("author"):
+            template["author"] = meta["author"]
+        content = _yaml.safe_dump(template, allow_unicode=True, sort_keys=False)
+        media_type = "text/yaml; charset=utf-8"
+        filename = f"{prompt_id}_v{version}.yaml"
+
+    else:
+        content = d["prompt"]
+        media_type = "text/plain; charset=utf-8"
+        filename = f"{prompt_id}_v{version}.txt"
+
+    return Response(
+        content=content.encode("utf-8"),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/prompts/{prompt_id}", response_class=HTMLResponse)
 def prompt_detail(request: Request, prompt_id: str):
     project = get_project()
     info = project.get_prompt_info(prompt_id)
     versions = project.list_prompt_versions(prompt_id)
 
-    current_version = None
-    if info["production"]:
-        current_version = info["production"]["version"]
-    elif versions:
-        current_version = versions[-1]
+    current_version = versions[-1] if versions else None
 
     prompt_data = None
     if current_version:
@@ -533,28 +585,6 @@ def prompt_diff(
     )
 
 
-
-# --- History ---
-
-@app.get("/history", response_class=HTMLResponse)
-def history(request: Request, id: str | None = Query(None)):
-    from pvm.storage.history import read_history
-
-    project = get_project()
-    prompt_ids = project.list_prompt_ids()
-
-    if id:
-        history_file = project.paths.prompt_history_file(id)
-    else:
-        history_file = project.paths.snapshot_history_file
-
-    entries = read_history(history_file) if history_file.exists() else []
-
-    return _render(request, "history.html",
-        prompt_ids=prompt_ids,
-        selected_id=id or "",
-        history_entries=entries,
-    )
 
 
 # --- Open Explorer ---

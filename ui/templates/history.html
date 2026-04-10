@@ -8,7 +8,7 @@
   <div class="bg-white rounded-lg shadow p-4">
     <form method="get" action="/history" class="flex items-center gap-4">
       <select name="id" class="text-sm border rounded px-3 py-2">
-        <option value="">전체 (Snapshot History)</option>
+        <option value="">Prompt 선택...</option>
         {% for pid in prompt_ids %}
         <option value="{{ pid }}" {% if selected_id == pid %}selected{% endif %}>{{ pid }}</option>
         {% endfor %}
