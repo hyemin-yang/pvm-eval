@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}pvm - Compare 리포트 · {{ info.id }}{% endblock %}
+{% block content %}
+<div class="p-8 max-w-5xl">
+
+  <div class="mb-6">
+    <a href="/prompts/{{ info.id }}"
+       class="text-sm text-gray-400 hover:text-gray-600">← {{ info.id }}</a>
+    <div class="flex items-center justify-between mt-2">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">비교 리포트</h1>
+        <p class="text-sm text-gray-400 mt-1">
+          <span class="font-semibold text-blue-600">v{{ version_a }}</span>
+          <span class="mx-1.5 text-gray-300">vs</span>
+          <span class="font-semibold text-red-500">v{{ version_b }}</span>
+          <span class="mx-1.5">·</span>
+          <span class="font-mono">{{ compare_hash }}</span>
+          {% if created_at %}<span class="mx-1.5">·</span>{{ created_at }}{% endif %}
+        </p>
+      </div>
+      <a href="{{ compare_url_base }}/step3"
+         class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-200 transition">
+        ← 실행 화면
+      </a>
+    </div>
+  </div>
+
+  <!-- 요약 카드 -->
+  <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-center">
+      <div class="text-4xl font-bold text-blue-700">{{ summary.a_wins }}</div>
+      <div class="text-sm font-semibold text-blue-500 mt-1">A 승 (v{{ version_a }})</div>
+      <div class="text-2xl font-mono text-blue-600 mt-1">{{ summary.a_rate }}%</div>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 text-center">
+      <div class="text-4xl font-bold text-gray-600">{{ summary.ties }}</div>
+      <div class="text-sm font-semibold text-gray-500 mt-1">무승부 (SAME)</div>
+      <div class="text-2xl font-mono text-gray-500 mt-1">{{ summary.tie_rate }}%</div>
+    </div>
+    <div class="bg-red-50 border border-red-100 rounded-xl p-5 text-center">
+      <div class="text-4xl font-bold text-red-700">{{ summary.b_wins }}</div>
+      <div class="text-sm font-semibold text-red-500 mt-1">B 승 (v{{ version_b }})</div>
+      <div class="text-2xl font-mono text-red-600 mt-1">{{ summary.b_rate }}%</div>
+    </div>
+  </div>
+
+  <!-- 진행 바 -->
+  <div class="mb-8">
+    <div class="flex h-5 rounded-full overflow-hidden bg-gray-100">
+      {% if summary.a_wins > 0 %}
+      <div class="bg-blue-500 transition-all flex items-center justify-center text-white text-xs font-bold"
+           style="width: {{ summary.a_rate }}%">
+        {% if summary.a_rate >= 10 %}{{ summary.a_rate }}%{% endif %}
+      </div>
+      {% endif %}
+      {% if summary.ties > 0 %}
+      <div class="bg-gray-300 transition-all flex items-center justify-center text-gray-600 text-xs"
+           style="width: {{ summary.tie_rate }}%">
+        {% if summary.tie_rate >= 10 %}{{ summary.tie_rate }}%{% endif %}
+      </div>
+      {% endif %}
+      {% if summary.b_wins > 0 %}
+      <div class="bg-red-400 transition-all flex items-center justify-center text-white text-xs font-bold"
+           style="width: {{ summary.b_rate }}%">
+        {% if summary.b_rate >= 10 %}{{ summary.b_rate }}%{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="flex justify-between text-xs text-gray-400 mt-1.5">
+      <span class="text-blue-500 font-medium">A: v{{ version_a }}</span>
+      <span>총 {{ summary.total }}건 평가{% if summary.errors %} · {{ summary.errors }}건 파싱 오류{% endif %}</span>
+      <span class="text-red-500 font-medium">B: v{{ version_b }}</span>
+    </div>
+  </div>
+
+  <!-- 필터 -->
+  <div class="flex items-center gap-2 mb-4">
+    <span class="text-sm text-gray-500 font-medium mr-1">필터:</span>
+    <button onclick="filterResults('ALL')"
+            class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 text-white" data-filter="ALL">
+      전체
+    </button>
+    <button onclick="filterResults('A')"
+            class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700" data-filter="A">
+      A 승 ({{ summary.a_wins }})
+    </button>
+    <button onclick="filterResults('SAME')"
+            class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="SAME">
+      무승부 ({{ summary.ties }})
+    </button>
+    <button onclick="filterResults('B')"
+            class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700" data-filter="B">
+      B 승 ({{ summary.b_wins }})
+    </button>
+    {% if summary.errors %}
+    <button onclick="filterResults('PARSE_ERROR')"
+            class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 hover:bg-orange-100 hover:text-orange-700" data-filter="PARSE_ERROR">
+      오류 ({{ summary.errors }})
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- 결과 목록 -->
+  <div class="space-y-3" id="results-container">
+    {% for r in judge_data.results %}
+    {% set verdict = r.get('judge_verdict', '') %}
+    <div class="result-card bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition"
+         data-verdict="{{ verdict }}">
+
+      <!-- 카드 헤더 -->
+      <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <span class="font-mono text-xs text-gray-500">{{ r.get('trace_id', '') }}</span>
+        <span class="ml-auto text-xs font-bold px-3 py-1 rounded-full
+          {% if verdict == 'A' %}bg-blue-100 text-blue-700
+          {% elif verdict == 'B' %}bg-red-100 text-red-700
+          {% elif verdict == 'SAME' %}bg-gray-200 text-gray-600
+          {% else %}bg-orange-100 text-orange-700{% endif %}">
+          {% if verdict == 'A' %}A 승 (v{{ version_a }})
+          {% elif verdict == 'B' %}B 승 (v{{ version_b }})
+          {% elif verdict == 'SAME' %}무승부
+          {% else %}{{ verdict or '?' }}{% endif %}
+        </span>
+      </div>
+
+      <!-- 본문: 토글 -->
+      <details>
+        <summary class="px-5 py-3 cursor-pointer select-none text-sm text-gray-500 hover:bg-gray-50">
+          상세 보기
+        </summary>
+        <div class="px-5 pb-5 pt-2">
+
+          <!-- 쿼리 -->
+          {% if r.get('user_input') %}
+          <div class="mb-3">
+            <p class="text-xs font-semibold text-gray-400 mb-1">User Input</p>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-lg p-3 max-h-32 overflow-auto">{{ r.user_input }}</p>
+          </div>
+          {% endif %}
+
+          <!-- 두 응답 비교 -->
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div class="border border-blue-100 rounded-lg p-3
+                        {% if verdict == 'A' %}bg-blue-50{% else %}bg-white{% endif %}">
+              <p class="text-xs font-semibold text-blue-500 mb-1">
+                Response A (v{{ version_a }})
+                {% if verdict == 'A' %}<span class="ml-1">★ 승</span>{% endif %}
+              </p>
+              <p class="text-xs text-gray-700 whitespace-pre-wrap max-h-40 overflow-auto">{{ r.get('response_a', '') }}</p>
+            </div>
+            <div class="border border-red-100 rounded-lg p-3
+                        {% if verdict == 'B' %}bg-red-50{% else %}bg-white{% endif %}">
+              <p class="text-xs font-semibold text-red-500 mb-1">
+                Response B (v{{ version_b }})
+                {% if verdict == 'B' %}<span class="ml-1">★ 승</span>{% endif %}
+              </p>
+              <p class="text-xs text-gray-700 whitespace-pre-wrap max-h-40 overflow-auto">{{ r.get('llm_output', '') }}</p>
+            </div>
+          </div>
+
+          <!-- Judge 이유 -->
+          {% if r.get('judge_reason') %}
+          <div>
+            <p class="text-xs font-semibold text-gray-400 mb-1">Judge 판정 이유</p>
+            <p class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{{ r.judge_reason }}</p>
+          </div>
+          {% endif %}
+
+        </div>
+      </details>
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-400 bg-white border border-gray-200 rounded-xl">
+      결과 데이터가 없습니다.
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+<script>
+function filterResults(verdict) {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    const active = btn.dataset.filter === verdict;
+    btn.className = btn.className.replace(/bg-\S+|text-\S+/g, '').trim();
+    btn.classList.add(...(active
+      ? ['bg-gray-800', 'text-white']
+      : ['bg-gray-100', 'text-gray-600']));
+  });
+  document.querySelectorAll('.result-card').forEach(card => {
+    card.style.display = (verdict === 'ALL' || card.dataset.verdict === verdict) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

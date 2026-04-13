@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}pvm - Compare Step 3 · {{ info.id }}{% endblock %}
+{% block content %}
+<div class="p-8 max-w-4xl">
+
+  <div class="mb-6">
+    <a href="/prompts/{{ info.id }}"
+       class="text-sm text-gray-400 hover:text-gray-600">← {{ info.id }}</a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-2">버전 비교</h1>
+    <p class="text-sm text-gray-400 mt-1">
+      <span class="font-semibold text-gray-600">v{{ version_a }}</span>
+      <span class="mx-1.5 text-gray-300">vs</span>
+      <span class="font-semibold text-gray-600">v{{ version_b }}</span>
+      <span class="mx-1.5">·</span>
+      <span class="font-mono">{{ compare_hash }}</span>
+    </p>
+  </div>
+
+  <!-- 스텝 인디케이터 -->
+  {% set steps = [
+    ('에러 분석',      compare_url_base ~ '/step1', step_status.step1, true),
+    ('Judge 프롬프트', compare_url_base ~ '/step2', step_status.step2, step_status.step1),
+    ('Judge 실행',     compare_url_base ~ '/step3', step_status.step3, step_status.step2),
+    ('리포트',         compare_url_base ~ '/report', false,            step_status.step3),
+  ] %}
+  <div class="flex items-center gap-0 mb-8">
+    {% for label, href, done, accessible in steps %}
+    {% set i = loop.index0 %}
+    {% set is_current = i == 2 %}
+    {% if i > 0 %}
+    <div class="flex-1 h-px {% if steps[i-1][2] %}bg-green-400{% else %}bg-gray-200{% endif %}"></div>
+    {% endif %}
+    <a href="{{ href if accessible else '#' }}"
+       class="flex flex-col items-center gap-1 {% if not accessible %}pointer-events-none{% endif %}">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition
+                  {% if is_current %}ring-2 ring-indigo-500 ring-offset-2 bg-indigo-600 text-white
+                  {% elif done %}bg-green-500 text-white
+                  {% else %}bg-gray-200 text-gray-400{% endif %}">
+        {% if done and not is_current %}✓{% else %}{{ loop.index }}{% endif %}
+      </div>
+      <span class="text-xs whitespace-nowrap
+                   {% if is_current %}text-indigo-600 font-semibold
+                   {% elif done %}text-gray-600
+                   {% else %}text-gray-400{% endif %}">{{ label }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if not step_status.step2 and not is_running %}
+  <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-sm text-yellow-800">
+    ⚠️ Step 2(Judge 프롬프트 생성)를 먼저 실행해야 합니다.
+    <a href="{{ compare_url_base }}/step2" class="underline ml-1">Step 2로 이동 →</a>
+  </div>
+  {% else %}
+
+  <div class="bg-white border border-gray-200 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-semibold">Judge 실행 (A vs B)</h2>
+        <p class="text-sm text-gray-500 mt-0.5">pairwise judge가 각 trace별로 어느 버전이 더 나은지 판정합니다.</p>
+      </div>
+      {% if not is_running %}
+      <form method="post" action="{{ compare_url_base }}/step3/run">
+        <button type="submit"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg
+                       hover:bg-indigo-500 transition whitespace-nowrap">
+          {% if step_status.step3 %}↺ 재실행{% else %}▶ 실행{% endif %}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if is_running %}
+
+    <div class="mb-6 border border-amber-300 bg-amber-50 rounded-xl p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+        <span class="text-sm font-semibold text-amber-800">실행 중...</span>
+        <span id="elapsed-label" class="text-xs text-amber-600 ml-1"></span>
+        <form method="post" action="{{ compare_url_base }}/step3/stop" class="ml-auto"
+              onsubmit="return confirm('실행을 중지하시겠습니까?')">
+          <button type="submit"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700
+                         text-xs font-semibold rounded-lg hover:bg-red-200 transition border border-red-200">
+            ⏹ 중지
+          </button>
+        </form>
+      </div>
+      <pre id="live-log"
+           class="text-xs font-mono bg-gray-900 text-green-300 rounded-lg p-4
+                  h-56 overflow-auto whitespace-pre-wrap leading-relaxed">{{ run_log or '로그를 기다리는 중...' }}</pre>
+    </div>
+
+    {% elif judge_data and judge_data.get('_summary') %}
+
+    {% set s = judge_data._summary %}
+
+    <!-- A/B/SAME 요약 -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-blue-700">{{ s.a_wins }}</div>
+        <div class="text-xs text-blue-500 mt-1 font-semibold">A 승 (v{{ version_a }})</div>
+        <div class="text-lg font-mono text-blue-600 mt-0.5">{{ s.a_rate }}%</div>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-gray-600">{{ s.ties }}</div>
+        <div class="text-xs text-gray-500 mt-1 font-semibold">무승부</div>
+        <div class="text-lg font-mono text-gray-500 mt-0.5">{{ s.tie_rate }}%</div>
+      </div>
+      <div class="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+        <div class="text-3xl font-bold text-red-700">{{ s.b_wins }}</div>
+        <div class="text-xs text-red-500 mt-1 font-semibold">B 승 (v{{ version_b }})</div>
+        <div class="text-lg font-mono text-red-600 mt-0.5">{{ s.b_rate }}%</div>
+      </div>
+    </div>
+
+    <!-- 진행 바 -->
+    <div class="mb-6">
+      <div class="flex h-4 rounded-full overflow-hidden bg-gray-100">
+        {% if s.a_wins > 0 %}
+        <div class="bg-blue-500 transition-all" style="width: {{ s.a_rate }}%"></div>
+        {% endif %}
+        {% if s.ties > 0 %}
+        <div class="bg-gray-300 transition-all" style="width: {{ s.tie_rate }}%"></div>
+        {% endif %}
+        {% if s.b_wins > 0 %}
+        <div class="bg-red-400 transition-all" style="width: {{ s.b_rate }}%"></div>
+        {% endif %}
+      </div>
+      <div class="flex justify-between text-xs text-gray-400 mt-1">
+        <span>A (v{{ version_a }})</span>
+        <span>총 {{ s.total }}건</span>
+        <span>B (v{{ version_b }})</span>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+      <p class="text-sm font-semibold text-gray-700">상세 리포트</p>
+      <a href="{{ compare_url_base }}/report"
+         class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-700 transition">
+        리포트 보기 →
+      </a>
+    </div>
+
+    {% if run_log %}
+    <details class="mt-4">
+      <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">
+        마지막 실행 로그 보기
+      </summary>
+      <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-3
+                  whitespace-pre-wrap overflow-auto max-h-48 text-gray-600">{{ run_log }}</pre>
+    </details>
+    {% endif %}
+
+    {% else %}
+
+    {% if run_log %}
+    <div class="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+      <p class="text-sm font-semibold text-red-700 mb-2">❌ 마지막 실행이 실패했습니다</p>
+      <pre class="text-xs font-mono bg-gray-900 text-red-300 rounded-lg p-4
+                  h-48 overflow-auto whitespace-pre-wrap leading-relaxed">{{ run_log }}</pre>
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-400">
+      <div class="text-4xl mb-3">⚖️</div>
+      <p class="text-sm">아직 Judge 실행 결과가 없습니다.</p>
+      <p class="text-xs mt-1">실행 버튼을 클릭하면 A/B 비교를 시작합니다.</p>
+    </div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+
+  {% endif %}
+</div>
+
+{% if is_running %}
+<script>
+(function () {
+  const logEl = document.getElementById('live-log');
+  const elapsedEl = document.getElementById('elapsed-label');
+  let startTime = Date.now();
+  function formatElapsed(ms) {
+    const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+    return m > 0 ? `${m}분 ${s % 60}초` : `${s}초`;
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+  const timer = setInterval(() => {
+    elapsedEl.textContent = '(' + formatElapsed(Date.now() - startTime) + ' 경과)';
+  }, 1000);
+  function poll() {
+    fetch('{{ compare_url_base }}/step3/status')
+      .then(r => r.json())
+      .then(data => {
+        if (data.log) { logEl.textContent = data.log; logEl.scrollTop = logEl.scrollHeight; }
+        if (data.status === 'running') { setTimeout(poll, 2000); }
+        else { clearInterval(timer); setTimeout(() => location.reload(), 1000); }
+      })
+      .catch(() => setTimeout(poll, 3000));
+  }
+  setTimeout(poll, 2000);
+})();
+</script>
+{% endif %}
+{% endblock %}

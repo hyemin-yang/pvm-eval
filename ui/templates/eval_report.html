@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}pvm - Judge 실행 리포트{% endblock %}
+{% block content %}
+<div class="p-8 max-w-6xl">
+
+  <!-- 헤더 -->
+  <div class="mb-6">
+    <a href="{{ eval_url_base }}/step3" class="text-sm text-gray-400 hover:text-gray-600">← Step 3</a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-2">Judge 실행 리포트</h1>
+    <p class="text-sm text-gray-500 mt-1">
+      {{ info.id }} · v{{ version }}
+      {% if judge_data %}
+        {% if judge_data.get('model') %}&nbsp;·&nbsp;{{ judge_data.model }}{% endif %}
+        {% if judge_data.get('run_at') %}&nbsp;·&nbsp;{{ judge_data.run_at[:19] | replace("T", " ") }} UTC{% endif %}
+      {% endif %}
+    </p>
+  </div>
+
+  {% if judge_data %}
+  {% set m = judge_data.metrics or {} %}
+
+  <!-- 메트릭 카드 -->
+  {% set conf = m.get('confusion') or {} %}
+  {% set pass_cnt = (conf.get('tp', 0) + conf.get('fp', 0)) %}
+  {% set pr = (pass_cnt / m.valid * 100) if m.valid else 0 %}
+  <div class="grid grid-cols-2 gap-4 mb-8
+              {% if judge_data.get('judge_type') == 'pointwise' %}sm:grid-cols-4{% endif %}">
+
+    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-5 text-center">
+      <div class="text-3xl font-bold text-indigo-700">{{ "%.1f"|format(pr) }}%</div>
+      <div class="text-xs text-indigo-500 mt-1 font-medium">Pass Rate</div>
+      <div class="text-xs text-indigo-400 mt-0.5">
+        {{ pass_cnt }}/{{ m.get('valid', '-') }}건 · 정확도 {{ "%.1f"|format((m.accuracy or 0) * 100) }}%
+      </div>
+    </div>
+
+    {% if judge_data.get('judge_type') == 'pointwise' and m.get('precision') is not none %}
+    <div class="bg-green-50 border border-green-100 rounded-xl p-5 text-center">
+      <div class="text-3xl font-bold text-green-700">{{ "%.1f"|format((m.precision or 0) * 100) }}%</div>
+      <div class="text-xs text-green-500 mt-1 font-medium">정밀도 (Precision)</div>
+      <div class="text-xs text-green-400 mt-0.5">TP/(TP+FP)</div>
+    </div>
+    <div class="bg-yellow-50 border border-yellow-100 rounded-xl p-5 text-center">
+      <div class="text-3xl font-bold text-yellow-700">{{ "%.1f"|format((m.recall or 0) * 100) }}%</div>
+      <div class="text-xs text-yellow-500 mt-1 font-medium">재현율 (Recall)</div>
+      <div class="text-xs text-yellow-400 mt-0.5">TP/(TP+FN)</div>
+    </div>
+    <div class="bg-purple-50 border border-purple-100 rounded-xl p-5 text-center">
+      <div class="text-3xl font-bold text-purple-700">{{ "%.3f"|format(m.f1 or 0) }}</div>
+      <div class="text-xs text-purple-500 mt-1 font-medium">F1 Score</div>
+      <div class="text-xs text-purple-400 mt-0.5">2·P·R/(P+R)</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 혼동 행렬 -->
+  {% if judge_data.get('judge_type') == 'pointwise' and m.get('confusion') %}
+  <div class="bg-white border border-gray-200 rounded-xl p-6 mb-8 inline-block">
+    <h2 class="text-base font-semibold text-gray-800 mb-4">혼동 행렬</h2>
+    <div class="inline-grid grid-cols-3 gap-1.5 text-sm text-center">
+      <div class="p-2 text-gray-400 text-xs"></div>
+      <div class="p-2.5 bg-gray-100 font-semibold text-gray-600 rounded-lg text-xs">Judge: Pass</div>
+      <div class="p-2.5 bg-gray-100 font-semibold text-gray-600 rounded-lg text-xs">Judge: Fail</div>
+      <div class="p-2.5 bg-gray-100 font-semibold text-gray-600 rounded-lg text-xs">Human: Pass</div>
+      <div class="p-4 bg-green-100 text-green-800 font-bold text-xl rounded-lg">
+        {{ m.confusion.tp }}<div class="text-xs font-normal text-green-600">TP</div>
+      </div>
+      <div class="p-4 bg-red-100 text-red-800 font-bold text-xl rounded-lg">
+        {{ m.confusion.fn }}<div class="text-xs font-normal text-red-600">FN</div>
+      </div>
+      <div class="p-2.5 bg-gray-100 font-semibold text-gray-600 rounded-lg text-xs">Human: Fail</div>
+      <div class="p-4 bg-orange-100 text-orange-800 font-bold text-xl rounded-lg">
+        {{ m.confusion.fp }}<div class="text-xs font-normal text-orange-600">FP</div>
+      </div>
+      <div class="p-4 bg-green-100 text-green-800 font-bold text-xl rounded-lg">
+        {{ m.confusion.tn }}<div class="text-xs font-normal text-green-600">TN</div>
+      </div>
+    </div>
+    {% if m.get('error_count', 0) > 0 %}
+    <p class="text-xs text-orange-500 mt-3">⚠️ 파싱 오류 {{ m.error_count }}건 제외됨</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- 트레이스별 결과 테이블 -->
+  {% if judge_data.get('results') %}
+  <div class="bg-white border border-gray-200 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-gray-800">트레이스별 결과</h2>
+      <div class="flex items-center gap-3 text-xs">
+        <label class="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" id="filter-mismatch" class="rounded" onchange="filterRows()">
+          <span class="text-gray-600">불일치만 보기</span>
+        </label>
+        <span class="text-gray-400">{{ judge_data.results | length }}건</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100">
+            <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 w-8">#</th>
+            <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500">Trace ID</th>
+            <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 w-20">Human</th>
+            <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 w-20">Judge</th>
+            <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 w-12">일치</th>
+            <th class="text-left py-2 text-xs font-semibold text-gray-500">Human 이유</th>
+          </tr>
+        </thead>
+        <tbody id="results-table">
+          {% for r in judge_data.results %}
+          {% set human = r.get('human_label', '') %}
+          {% set verdict = r.get('judge_verdict', r.get('judge_label', '')) %}
+          {% set no_label = not human %}
+          {% set match = (not no_label) and verdict == human and verdict != 'PARSE_ERROR' %}
+          <tr class="border-b border-gray-50 hover:bg-gray-50 result-row
+                     {% if not match and not no_label %}mismatch{% endif %}"
+              onclick="toggleDetail({{ loop.index0 }})"
+              style="cursor:pointer">
+            <td class="py-2.5 pr-4 text-gray-400 text-xs">{{ loop.index }}</td>
+            <td class="py-2.5 pr-4 font-mono text-xs text-gray-700">{{ r.get('trace_id', '-') }}</td>
+            <td class="py-2.5 pr-4">
+              {% if human %}
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                {% if human == 'Pass' or human == 'A' %}bg-green-100 text-green-700
+                {% elif human == 'Fail' or human == 'B' %}bg-red-100 text-red-700
+                {% else %}bg-gray-100 text-gray-600{% endif %}">{{ human }}</span>
+              {% else %}
+              <span class="text-xs text-gray-300">-</span>
+              {% endif %}
+            </td>
+            <td class="py-2.5 pr-4">
+              {% if verdict == 'PARSE_ERROR' %}
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">ERR</span>
+              {% elif verdict %}
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                {% if verdict == 'Pass' or verdict == 'A' %}bg-green-100 text-green-700
+                {% elif verdict == 'Fail' or verdict == 'B' %}bg-red-100 text-red-700
+                {% else %}bg-gray-100 text-gray-600{% endif %}">{{ verdict }}</span>
+              {% else %}
+              <span class="text-xs text-gray-300">-</span>
+              {% endif %}
+            </td>
+            <td class="py-2.5 pr-4 text-base">
+              {% if verdict == 'PARSE_ERROR' %}⚠️
+              {% elif no_label %}<span class="text-xs text-gray-300">-</span>
+              {% elif match %}✅
+              {% else %}❌
+              {% endif %}
+            </td>
+            <td class="py-2.5 text-xs text-gray-500 max-w-xs truncate">
+              {{ r.get('human_reason', r.get('human_label', '')) }}
+            </td>
+          </tr>
+          <!-- 상세 패널 -->
+          <tr id="detail-{{ loop.index0 }}" class="hidden result-row {% if not match %}mismatch{% endif %}">
+            <td colspan="7" class="pb-3 pt-1 pr-2">
+              <div class="ml-8 bg-gray-50 rounded-lg p-4 border border-gray-100 text-xs space-y-2">
+                {% if r.get('human_reason') %}
+                <div>
+                  <span class="font-semibold text-gray-600">Human 이유:</span>
+                  <span class="text-gray-700 ml-1">{{ r.human_reason }}</span>
+                </div>
+                {% endif %}
+                {% set detail = r.get('judge_detail', {}) %}
+                {% if detail %}
+                  {% if detail.get('criteria_results') %}
+                  <div>
+                    <span class="font-semibold text-gray-600 block mb-1">Judge 판정 상세:</span>
+                    {% for cr in detail.criteria_results %}
+                    <div class="flex items-start gap-2 mb-1">
+                      <span class="px-1.5 py-0.5 rounded text-xs font-bold flex-shrink-0
+                        {% if cr.result == 'Pass' %}bg-green-100 text-green-700
+                        {% else %}bg-red-100 text-red-700{% endif %}">{{ cr.result }}</span>
+                      <span class="text-gray-500 font-medium mr-1">{{ cr.criterion }}:</span>
+                      <span class="text-gray-600">{{ cr.critique }}</span>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% elif detail.get('explanation') %}
+                  <div>
+                    <span class="font-semibold text-gray-600">Judge 설명:</span>
+                    <span class="text-gray-700 ml-1">{{ detail.explanation }}</span>
+                  </div>
+                  {% endif %}
+                  {% if detail.get('error') %}
+                  <div class="text-orange-600">⚠️ {{ detail.error }}</div>
+                  {% endif %}
+                {% elif r.get('judge_reason') or r.get('reason') %}
+                <div>
+                  <span class="font-semibold text-gray-600">Judge 이유:</span>
+                  <span class="text-gray-700 ml-1">{{ r.get('judge_reason', r.get('reason', '')) }}</span>
+                </div>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
+    <div class="text-4xl mb-3">📊</div>
+    <p class="text-sm">결과 데이터가 없습니다.</p>
+    <a href="{{ eval_url_base }}/step3" class="mt-3 inline-block text-sm text-indigo-600 hover:text-indigo-800">
+      Step 3으로 →
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function toggleDetail(idx) {
+  document.getElementById('detail-' + idx).classList.toggle('hidden');
+}
+function filterRows() {
+  const onlyMismatch = document.getElementById('filter-mismatch').checked;
+  document.querySelectorAll('.result-row').forEach(row => {
+    if (onlyMismatch && !row.classList.contains('mismatch')) {
+      row.classList.add('hidden');
+    } else {
+      row.classList.remove('hidden');
+    }
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="review-api-base" content="{{ review_api_base }}">
+<title>Annotation Review - {{ prompt_id }} v{{ version }}</title>
+<script>const REVIEW_API_BASE = document.querySelector("meta[name=review-api-base]").content;</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ── */
+  #topbar {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 0 24px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 16px;
+  }
+  #topbar h1 { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  #progress-text { font-size: 13px; color: #a0aec0; white-space: nowrap; }
+  #progress-bar-wrap {
+    flex: 1; max-width: 260px;
+    background: #2d3748; border-radius: 4px; height: 6px; overflow: hidden;
+  }
+  #progress-bar { height: 100%; background: #48bb78; transition: width 0.3s; width: 0%; }
+
+  #jump-wrap { display: flex; gap: 6px; align-items: center; }
+  #jump-wrap label { font-size: 12px; color: #a0aec0; }
+  #jump-input {
+    width: 64px; padding: 3px 6px; border-radius: 4px; border: none;
+    background: #2d3748; color: #fff; font-size: 12px; text-align: center;
+  }
+  #jump-btn {
+    padding: 3px 10px; border-radius: 4px; border: none;
+    background: #4a5568; color: #fff; font-size: 12px; cursor: pointer;
+  }
+  #jump-btn:hover { background: #718096; }
+  #upload-btn {
+    padding: 4px 14px; border-radius: 4px; border: none;
+    background: #276749; color: #fff; font-size: 12px; cursor: pointer;
+    white-space: nowrap;
+  }
+  #upload-btn:hover { background: #22543d; }
+  #export-btn {
+    padding: 4px 14px; border-radius: 4px; border: none;
+    background: #2b6cb0; color: #fff; font-size: 12px; cursor: pointer;
+    white-space: nowrap;
+  }
+  #export-btn:hover { background: #2c5282; }
+
+  /* Upload modal */
+  .upload-info { font-size: 13px; color: #2d3748; margin-bottom: 16px; line-height: 1.7; }
+  .upload-info strong { color: #1a1a2e; }
+  .upload-warn { font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; }
+  .modal-btn-confirm { background: #f56565; color: #fff; }
+  .modal-btn-confirm:hover { background: #e53e3e; }
+  .modal-btn-keep { background: #48bb78; color: #fff; }
+  .modal-btn-keep:hover { background: #38a169; }
+
+  /* ── Main layout ── */
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* ── Trace panel ── */
+  #trace-panel {
+    flex: 1;
+    background: #fff;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  #trace-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  #scenario-badge {
+    background: #ebf8ff; color: #2b6cb0;
+    font-size: 12px; font-weight: 700;
+    padding: 3px 10px; border-radius: 20px;
+    border: 1px solid #bee3f8; white-space: nowrap;
+  }
+  #label-badge {
+    font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px; display: none;
+  }
+  .badge-pass { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+  .badge-fail { background: #fff5f5; color: #9b2c2c; border: 1px solid #feb2b2; }
+  .badge-defer { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+  .badge-a    { background: #e8ecff; color: #553c9a; border: 1px solid #b794f4; }
+  .badge-b    { background: #fff5eb; color: #c05621; border: 1px solid #fbd38d; }
+  .badge-same { background: #f0f4f8; color: #4a5568; border: 1px solid #cbd5e0; }
+
+  #conversation-wrap {
+    flex: 1; overflow-y: auto; padding: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .turn {
+    padding: 12px 16px; border-radius: 8px;
+    font-size: 14px; line-height: 1.65;
+    white-space: pre-wrap; border-left: 4px solid transparent;
+  }
+  .turn-ai   { background: #ebf8ff; border-left-color: #4299e1; }
+  .turn-user { background: #f0fff4; border-left-color: #48bb78; }
+  .turn-response-a { background: #e8ecff; border-left-color: #667eea; }
+  .turn-response-b { background: #fff5eb; border-left-color: #ed8936; }
+  .turn-label {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px;
+  }
+  .turn-ai .turn-label         { color: #2b6cb0; }
+  .turn-user .turn-label       { color: #276749; }
+  .turn-response-a .turn-label { color: #553c9a; }
+  .turn-response-b .turn-label { color: #c05621; }
+
+  /* ── Annotation panel ── */
+  #annotation-panel {
+    width: 360px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    gap: 12px; overflow-y: auto;
+  }
+  .panel-card {
+    background: #fff; border-radius: 12px; padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); flex-shrink: 0;
+  }
+  .panel-card h3 {
+    font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #718096;
+    margin-bottom: 14px; font-weight: 700;
+  }
+  .borderline-label {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 14px; font-weight: 500;
+  }
+  .borderline-label input[type="checkbox"] {
+    width: 16px; height: 16px; cursor: pointer; accent-color: #667eea;
+  }
+  .borderline-desc {
+    font-size: 11px; color: #718096; margin-top: 10px; line-height: 1.6;
+  }
+
+  /* Pass/Fail/Defer */
+  #verdict-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #verdict-buttons button {
+    padding: 12px 8px; border-radius: 8px;
+    border: 2px solid transparent; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  #btn-pass { background: #f0fff4; color: #276749; border-color: #9ae6b4; grid-column: 1; }
+  #btn-pass:hover, #btn-pass.active { background: #48bb78; color: #fff; border-color: #48bb78; }
+  #btn-fail { background: #fff5f5; color: #9b2c2c; border-color: #feb2b2; grid-column: 2; }
+  #btn-fail:hover, #btn-fail.active { background: #f56565; color: #fff; border-color: #f56565; }
+  #btn-defer {
+    background: #fffbeb; color: #92400e; border-color: #fcd34d;
+    grid-column: 1 / -1; font-size: 13px; padding: 9px;
+  }
+  #btn-defer:hover, #btn-defer.active { background: #f6ad55; color: #fff; border-color: #f6ad55; }
+
+  /* Pairwise verdict buttons */
+  #verdict-buttons-pairwise { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #verdict-buttons-pairwise button {
+    padding: 12px 8px; border-radius: 8px;
+    border: 2px solid transparent; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  #btn-a { background: #e8ecff; color: #553c9a; border-color: #b794f4; grid-column: 1; }
+  #btn-a:hover, #btn-a.active { background: #667eea; color: #fff; border-color: #667eea; }
+  #btn-b { background: #fff5eb; color: #c05621; border-color: #fbd38d; grid-column: 2; }
+  #btn-b:hover, #btn-b.active { background: #ed8936; color: #fff; border-color: #ed8936; }
+  #btn-same {
+    background: #f0f4f8; color: #4a5568; border-color: #cbd5e0;
+    grid-column: 1 / -1; font-size: 13px; padding: 9px;
+  }
+  #btn-same:hover, #btn-same.active { background: #a0aec0; color: #fff; border-color: #a0aec0; }
+
+  /* Critique */
+  #critique-area {
+    width: 100%; height: 130px; padding: 10px;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 13px; font-family: inherit; resize: vertical;
+    line-height: 1.6; color: #2d3748; transition: border-color 0.15s;
+  }
+  #critique-area:focus {
+    outline: none; border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+  }
+  #save-status { font-size: 11px; color: #a0aec0; margin-top: 6px; text-align: right; height: 14px; }
+  .save-ok { color: #48bb78 !important; }
+  .save-err { color: #f56565 !important; }
+
+  /* ── Category ── */
+  #category-select {
+    width: 100%; padding: 8px 10px;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 13px; font-family: inherit; color: #2d3748;
+    background: #fff; cursor: pointer;
+  }
+  #category-select:focus {
+    outline: none; border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+  }
+  #new-category-wrap {
+    margin-top: 8px; display: flex; gap: 6px; align-items: center;
+  }
+  #new-category-input {
+    flex: 1; padding: 7px 10px;
+    border: 1px solid #c3dafe; border-radius: 8px;
+    font-size: 13px; font-family: inherit; color: #2d3748;
+  }
+  #new-category-input:focus {
+    outline: none; border-color: #4299e1;
+    box-shadow: 0 0 0 2px rgba(66,153,225,0.12);
+  }
+  .cat-btn {
+    padding: 6px 12px; border-radius: 6px; border: none;
+    font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  #new-category-confirm { background: #4299e1; color: #fff; }
+  #new-category-confirm:hover { background: #3182ce; }
+  #new-category-cancel  { background: #edf2f7; color: #4a5568; }
+  #new-category-cancel:hover  { background: #e2e8f0; }
+
+  /* ── AI Improve ── */
+  #ai-settings { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+  #ai-settings-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: #4a5568;
+    cursor: pointer; user-select: none; margin-bottom: 10px;
+  }
+  #ai-settings-toggle:hover { color: #2d3748; }
+  #ai-settings-body { display: flex; flex-direction: column; gap: 8px; }
+  .ai-field label { display: block; font-size: 11px; color: #718096; margin-bottom: 4px; font-weight: 600; }
+  .ai-field input, .ai-field select {
+    width: 100%; padding: 7px 10px; border: 1px solid #e2e8f0;
+    border-radius: 6px; font-size: 12px; font-family: inherit; color: #2d3748;
+    background: #fff;
+  }
+  .ai-field input:focus, .ai-field select:focus {
+    outline: none; border-color: #4299e1;
+    box-shadow: 0 0 0 2px rgba(66,153,225,0.12);
+  }
+  .ai-model-note { font-size: 10px; color: #a0aec0; margin-top: 3px; }
+
+  #btn-ai-improve {
+    width: 100%; margin-top: 12px; padding: 9px;
+    border-radius: 8px; border: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  #btn-ai-improve:hover { opacity: 0.88; }
+  #btn-ai-improve:disabled { opacity: 0.5; cursor: not-allowed; }
+  #ai-error { font-size: 11px; color: #f56565; margin-top: 6px; display: none; }
+
+  /* Navigation */
+  #nav-buttons { display: flex; gap: 8px; }
+  #nav-buttons button {
+    flex: 1; padding: 10px; border-radius: 8px;
+    border: 1px solid #e2e8f0; background: #f7fafc;
+    color: #4a5568; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  #nav-buttons button:hover { background: #edf2f7; }
+  #nav-buttons button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Shortcuts */
+  #shortcuts { font-size: 11px; color: #a0aec0; line-height: 1.8; }
+  .shortcut-row { display: flex; gap: 8px; align-items: center; }
+  kbd {
+    background: #edf2f7; color: #4a5568; padding: 1px 6px;
+    border-radius: 3px; font-size: 10px; font-family: monospace;
+    border: 1px solid #cbd5e0; min-width: 22px;
+    text-align: center; display: inline-block;
+  }
+
+  /* ── Modal overlay ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.18s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal-box {
+    background: #fff; border-radius: 14px;
+    padding: 28px 28px 22px;
+    max-width: 480px; width: 90%;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    transform: translateY(12px);
+    transition: transform 0.18s;
+  }
+  .modal-overlay.open .modal-box { transform: translateY(0); }
+  .modal-icon { font-size: 32px; margin-bottom: 10px; }
+  .modal-title { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
+  .modal-body  { font-size: 14px; color: #4a5568; line-height: 1.6; margin-bottom: 20px; }
+  .modal-path  {
+    background: #f7fafc; border: 1px solid #e2e8f0;
+    border-radius: 6px; padding: 10px 12px;
+    font-size: 12px; font-family: monospace; color: #2d3748;
+    word-break: break-all; margin-bottom: 20px;
+  }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-btn {
+    padding: 8px 20px; border-radius: 8px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .modal-btn-close { background: #edf2f7; color: #4a5568; }
+  .modal-btn-close:hover { background: #e2e8f0; }
+
+  /* ── AI Compare Modal ── */
+  #compare-modal .modal-box { max-width: 760px; }
+  #compare-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    margin-bottom: 16px;
+  }
+  .compare-col h4 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #718096; margin-bottom: 8px;
+  }
+  .compare-original {
+    background: #f7fafc; border: 1px solid #e2e8f0;
+    border-radius: 8px; padding: 12px;
+    font-size: 13px; line-height: 1.65; color: #4a5568;
+    min-height: 140px; white-space: pre-wrap;
+  }
+  #improved-edit {
+    width: 100%; height: 140px; padding: 12px;
+    border: 1px solid #c3dafe; border-radius: 8px;
+    font-size: 13px; font-family: inherit; resize: vertical;
+    line-height: 1.65; color: #2d3748;
+    background: #ebf4ff;
+  }
+  #improved-edit:focus { outline: none; border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+  .modal-btn-apply { background: #4299e1; color: #fff; }
+  .modal-btn-apply:hover { background: #3182ce; }
+
+  /* ── Setup Modal ── */
+  #setup-modal .modal-box { max-width: 560px; }
+  #setup-dropzone {
+    border: 2px dashed #cbd5e0; border-radius: 12px;
+    padding: 36px 20px; text-align: center; cursor: pointer;
+    transition: all 0.15s; margin: 16px 0 0; background: #f7fafc;
+  }
+  #setup-dropzone:hover, #setup-dropzone.drag-over {
+    border-color: #4299e1; background: #ebf8ff;
+  }
+  #setup-drop-icon { font-size: 36px; margin-bottom: 10px; }
+  #setup-drop-text { font-size: 14px; font-weight: 600; color: #4a5568; }
+  #setup-drop-hint { font-size: 12px; color: #a0aec0; margin-top: 4px; }
+  .setup-col-row { margin-bottom: 14px; }
+  .setup-col-row label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: #4a5568; margin-bottom: 6px;
+  }
+  .setup-col-row select {
+    width: 100%; padding: 8px 10px;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 13px; font-family: inherit; color: #2d3748; background: #fff;
+  }
+  .setup-col-row select:focus {
+    outline: none; border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+  }
+  .req { color: #e53e3e; margin-left: 4px; font-weight: 400; }
+  .opt { color: #a0aec0; margin-left: 4px; font-weight: 400; }
+  #setup-preview-wrap { margin-top: 16px; }
+  .setup-preview-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #718096; margin-bottom: 8px;
+  }
+  #setup-preview-table-wrap {
+    overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px;
+  }
+  .setup-preview-table {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  .setup-preview-table th {
+    background: #f7fafc; padding: 7px 12px; text-align: left;
+    font-weight: 600; color: #4a5568; border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+  }
+  .setup-preview-table td {
+    padding: 7px 12px; color: #2d3748; border-bottom: 1px solid #f0f4f8;
+    max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .setup-preview-table tr:last-child td { border-bottom: none; }
+  .setup-step-error {
+    font-size: 12px; color: #f56565; margin-top: 8px; display: none;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #1a1a2e; color: #fff;
+    padding: 10px 18px; border-radius: 8px; font-size: 13px;
+    opacity: 0; transition: opacity 0.2s;
+    pointer-events: none; z-index: 9999;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <a href="/prompts/{{ prompt_id }}/version/{{ version }}" style="padding:4px 12px;border-radius:4px;border:none;background:#2d3748;color:#a0aec0;font-size:12px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background='#4a5568'" onmouseout="this.style.background='#2d3748'">← pvm</a>
+  <h1 style="display:flex;align-items:center;gap:8px;">
+    Labeling
+    <span style="font-size:12px;font-weight:400;color:#718096;background:#2d3748;padding:2px 8px;border-radius:4px;font-family:monospace;">{{ prompt_id }} v{{ version }}</span>
+  </h1>
+  <div id="progress-text">로딩 중...</div>
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+  <div id="jump-wrap">
+    <label>ID</label>
+    <input id="jump-input" type="number" min="0" placeholder="0">
+    <button id="jump-btn">Go</button>
+  </div>
+  <button id="upload-btn">파일 업로드</button>
+  <button id="export-btn">CSV 내보내기</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- Trace panel -->
+  <div id="trace-panel">
+    <div id="trace-header">
+      <span id="scenario-badge">-</span>
+      <span id="label-badge"></span>
+    </div>
+    <div id="conversation-wrap"></div>
+  </div>
+
+  <!-- Annotation panel -->
+  <div id="annotation-panel">
+
+    <div class="panel-card">
+      <h3>판정</h3>
+      <!-- Pointwise: Pass / Fail / Defer -->
+      <div id="verdict-buttons">
+        <button id="btn-pass">✓ Pass</button>
+        <button id="btn-fail">✗ Fail</button>
+        <button id="btn-defer">— 보류 (Defer)</button>
+      </div>
+      <!-- Pairwise: A / SAME / B (hidden by default) -->
+      <div id="verdict-buttons-pairwise" style="display:none">
+        <button id="btn-a">▲ A 우세</button>
+        <button id="btn-b">▼ B 우세</button>
+        <button id="btn-same">= 동점 (SAME)</button>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>카테고리</h3>
+      <select id="category-select">
+        <option value="">-- 카테고리 없음 --</option>
+        <option value="__new__">✏️ 직접 입력...</option>
+      </select>
+      <div id="new-category-wrap" style="display:none">
+        <input id="new-category-input" type="text" placeholder="새 카테고리 입력...">
+        <button class="cat-btn" id="new-category-confirm">추가</button>
+        <button class="cat-btn" id="new-category-cancel">취소</button>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>Borderline</h3>
+      <label class="borderline-label">
+        <input type="checkbox" id="borderline-checkbox">
+        <span>경계선 사례</span>
+      </label>
+      <p class="borderline-desc">경계선 사례는 미묘한 차이로 pass/fail이 판가름 된 것을 의미합니다. AI가 우리의 의도대로 pass/fail을 구분해내기 위해 아주 필요한 판정입니다.</p>
+    </div>
+
+    <div class="panel-card">
+      <h3>Critique</h3>
+      <textarea id="critique-area" placeholder="판정 이유나 메모를 입력하세요..."></textarea>
+      <div id="save-status"></div>
+
+      <!-- AI Improve -->
+      <div id="ai-settings">
+        <div id="ai-settings-toggle">
+          <span id="ai-toggle-icon">▶</span> AI로 개선
+        </div>
+        <div id="ai-settings-body" style="display:none">
+          <div class="ai-field">
+            <label>OpenAI API Key</label>
+            <input id="ai-api-key" type="password" placeholder="sk-...">
+          </div>
+          <div class="ai-field">
+            <label>모델</label>
+            <select id="ai-model">
+              <option value="gpt-5.4-mini">GPT-5.4 mini</option>
+              <option value="gpt-4o-mini" selected>GPT-4o mini</option>
+            </select>
+            <div class="ai-model-note">* 추가 모델 지원 예정</div>
+          </div>
+          <button id="btn-ai-improve">✦ Critique 개선하기</button>
+          <div id="ai-error"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>탐색</h3>
+      <div id="nav-buttons">
+        <button id="btn-prev">← 이전</button>
+        <button id="btn-next">다음 →</button>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>키보드 단축키</h3>
+      <div id="shortcuts">
+        <div class="shortcut-row"><kbd>←</kbd><kbd>→</kbd> 이전/다음</div>
+        <div class="shortcut-row"><kbd>1</kbd> Pass &nbsp; <kbd>2</kbd> Fail &nbsp; <kbd>D</kbd> 보류</div>
+        <div class="shortcut-row"><kbd>U</kbd> 실행 취소</div>
+        <div class="shortcut-row"><kbd>⌘ Enter</kbd> 저장 후 다음</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Modal: 파일 업로드 + 컬럼 매핑 ── -->
+<div class="modal-overlay" id="setup-modal">
+  <div class="modal-box" style="max-width:560px">
+
+    <!-- Step 1: 파일 선택 -->
+    <div id="setup-step1">
+      <div class="modal-icon">📁</div>
+      <div class="modal-title">데이터 파일 업로드</div>
+      <div class="modal-body">평가할 LLM 생성물이 담긴 CSV, JSON 또는 XLSX 파일을 업로드하세요.</div>
+      <div id="setup-dropzone">
+        <div id="setup-drop-icon">📂</div>
+        <div id="setup-drop-text">파일을 드래그하거나 클릭하여 선택</div>
+        <div id="setup-drop-hint">CSV, JSON, XLSX 지원</div>
+        <input type="file" id="setup-file-input" accept=".csv,.json,.xlsx,.xls,application/json" style="display:none">
+      </div>
+      <div class="setup-step-error" id="setup-step1-error"></div>
+    </div>
+
+    <!-- Step 2: 컬럼 매핑 -->
+    <div id="setup-step2" style="display:none">
+      <div class="modal-title" style="margin-bottom:8px">컬럼 매핑</div>
+      <div class="modal-body" style="margin-bottom:16px; font-size:13px" id="setup-file-info"></div>
+      <div id="setup-col-map">
+        <div class="setup-col-row">
+          <label>대화 (conversation) 컬럼 <span class="opt">(또는 아래 user_input/llm_output 조합)</span></label>
+          <select id="setup-col-conv"></select>
+        </div>
+        <div class="setup-col-row">
+          <label>User Input 컬럼 <span class="opt">(conversation이 없을 때 사용)</span></label>
+          <select id="setup-col-user-input"></select>
+        </div>
+        <div class="setup-col-row">
+          <label>LLM Output / Response B 컬럼 <span class="opt">(conversation이 없을 때 사용)</span></label>
+          <select id="setup-col-llm-output"></select>
+        </div>
+        <div class="setup-col-row">
+          <label>Response A 컬럼 <span class="opt">(pairwise: 베이스라인 모델 응답, 없으면 pointwise 모드)</span></label>
+          <select id="setup-col-response-a"></select>
+        </div>
+        <div class="setup-col-row">
+          <label>ID / Scenario 컬럼 <span class="opt">(선택, 없으면 행 번호 사용)</span></label>
+          <select id="setup-col-id"></select>
+        </div>
+      </div>
+      <div id="setup-preview-wrap">
+        <div class="setup-preview-title">미리보기 (상위 3행)</div>
+        <div id="setup-preview-table-wrap"></div>
+      </div>
+      <div class="setup-step-error" id="setup-step2-error"></div>
+      <div class="modal-footer" style="margin-top:20px">
+        <button class="modal-btn modal-btn-close" id="setup-back-btn">← 뒤로</button>
+        <button class="modal-btn" id="setup-confirm-btn" style="background:#2b6cb0;color:#fff">업로드</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Modal: CSV 업로드 완료 (라벨 초기화 여부 선택) ── -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal-box">
+    <div class="modal-icon">📂</div>
+    <div class="modal-title">CSV 업로드 완료</div>
+    <div class="upload-info" id="upload-info-text"></div>
+    <div class="upload-warn">기존 라벨(labels.json)을 초기화할까요? 초기화하면 이전 작업 내용이 삭제됩니다.</div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-keep" id="btn-upload-keep">기존 라벨 유지</button>
+      <button class="modal-btn modal-btn-confirm" id="btn-upload-reset">라벨 초기화</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: 업로드 오류 ── -->
+<div class="modal-overlay" id="upload-error-modal">
+  <div class="modal-box">
+    <div class="modal-icon">❌</div>
+    <div class="modal-title">업로드 실패</div>
+    <div class="modal-body" id="upload-error-text"></div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-close" onclick="closeModal('upload-error-modal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: pass/fail 미선택 경고 ── -->
+<div class="modal-overlay" id="no-verdict-modal">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title">판정을 선택해주세요</div>
+    <div class="modal-body" id="no-verdict-modal-body">다음 항목으로 이동하기 전에 판정을 선택해야 합니다.</div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-close" onclick="closeModal('no-verdict-modal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Modal: AI 개선 비교 ── -->
+<div class="modal-overlay" id="compare-modal">
+  <div class="modal-box">
+    <div class="modal-title" style="margin-bottom:16px">✦ AI 개선 결과</div>
+    <div id="compare-grid">
+      <div class="compare-col">
+        <h4>내가 작성한 초안</h4>
+        <div class="compare-original" id="compare-original"></div>
+      </div>
+      <div class="compare-col">
+        <h4>AI 개선 결과 (직접 수정 가능)</h4>
+        <textarea id="improved-edit"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-close" onclick="closeModal('compare-modal')">취소 (초안 유지)</button>
+      <button class="modal-btn modal-btn-apply" id="btn-apply-improved">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let traces = [];
+let labels = {};
+let categories = [];
+let current = 0;
+let lastAction = null;
+let saveTimer = null;
+let prevCategoryValue = '';
+
+// ── Modal helpers ──────────────────────────────────
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', (e) => { if (e.target === el) closeModal(el.id); });
+});
+
+// ── Helpers ───────────────────────────────────────
+function isPairwiseTrace(t) {
+  return t && t.response_a !== undefined;
+}
+
+// ── Init ──────────────────────────────────────────
+async function init() {
+  const [tracesRes, labelsRes, categoriesRes] = await Promise.all([
+    fetch(REVIEW_API_BASE + '/traces').then(r => r.json()),
+    fetch(REVIEW_API_BASE + '/labels').then(r => r.json()),
+    fetch(REVIEW_API_BASE + '/categories').then(r => r.json()),
+  ]);
+  traces = tracesRes;
+  labels = labelsRes;
+  categories = categoriesRes;
+  renderCategorySelect();
+  render();
+  if (!traces.length) openSetupModal();
+}
+
+// ── Category select ───────────────────────────────
+function renderCategorySelect(selectedCat) {
+  const sel = document.getElementById('category-select');
+  sel.innerHTML = '<option value="">-- 카테고리 없음 --</option>';
+  for (const cat of categories) {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    sel.appendChild(opt);
+  }
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__';
+  newOpt.textContent = '✏️ 직접 입력...';
+  sel.appendChild(newOpt);
+  if (selectedCat !== undefined) sel.value = selectedCat || '';
+}
+
+function getCurrentCategory() {
+  const sel = document.getElementById('category-select');
+  return sel.value === '__new__' ? '' : sel.value;
+}
+
+function showNewCategoryInput() {
+  document.getElementById('new-category-wrap').style.display = 'flex';
+  const inp = document.getElementById('new-category-input');
+  inp.value = '';
+  inp.focus();
+}
+
+function hideNewCategoryInput() {
+  document.getElementById('new-category-wrap').style.display = 'none';
+}
+
+function confirmNewCategory() {
+  const inp = document.getElementById('new-category-input');
+  const val = inp.value.trim();
+  if (!val) { inp.focus(); return; }
+  if (!categories.includes(val)) {
+    categories.push(val);
+    categories.sort();
+  }
+  renderCategorySelect(val);
+  hideNewCategoryInput();
+  // Auto-save with new category
+  const existing = labels[String(traces[current].id)] || {};
+  saveLabel(existing.pass_fail || null, getCurrentCritique(), val, getCurrentFewShotType());
+}
+
+document.getElementById('category-select').addEventListener('change', (e) => {
+  if (e.target.value === '__new__') {
+    showNewCategoryInput();
+  } else {
+    hideNewCategoryInput();
+    prevCategoryValue = e.target.value;
+    const existing = labels[String(traces[current].id)] || {};
+    saveLabel(existing.pass_fail || null, getCurrentCritique(), e.target.value, getCurrentFewShotType());
+  }
+});
+
+document.getElementById('borderline-checkbox').addEventListener('change', () => {
+  const existing = labels[String(traces[current].id)] || {};
+  saveLabel(existing.pass_fail || null, getCurrentCritique(), getCurrentCategory(), getCurrentFewShotType());
+});
+
+document.getElementById('new-category-confirm').addEventListener('click', confirmNewCategory);
+document.getElementById('new-category-cancel').addEventListener('click', () => {
+  hideNewCategoryInput();
+  document.getElementById('category-select').value = prevCategoryValue;
+});
+document.getElementById('new-category-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); confirmNewCategory(); }
+  if (e.key === 'Escape') {
+    hideNewCategoryInput();
+    document.getElementById('category-select').value = prevCategoryValue;
+  }
+});
+
+// ── Render ────────────────────────────────────────
+function render() {
+  if (!traces.length) {
+    document.getElementById('progress-text').textContent = '데이터 없음';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('conversation-wrap').innerHTML =
+      '<div style="color:#a0aec0;text-align:center;padding:60px 20px;font-size:14px">업로드된 데이터가 없습니다.<br>위의 <strong>파일 업로드</strong> 버튼을 눌러 파일을 업로드하세요.</div>';
+    return;
+  }
+  const t = traces[current];
+  const label = labels[String(t.id)] || {};
+
+  const traceLabel = t.trace_id || t.scenario_id;
+  const turnLabel = t.turn_index ? ` / turn ${t.turn_index}` : '';
+  document.getElementById('scenario-badge').textContent = `trace: ${traceLabel}${turnLabel}`;
+
+  const pairwise = isPairwiseTrace(t);
+  const verdict = label.pass_fail || '';
+
+  const lb = document.getElementById('label-badge');
+  if (verdict) {
+    lb.style.display = 'inline-block';
+    if (pairwise) {
+      const badgeMap = { a: ['A 우세', 'badge-a'], b: ['B 우세', 'badge-b'], same: ['SAME', 'badge-same'], defer: ['보류', 'badge-defer'] };
+      const [text, cls] = badgeMap[verdict] || [verdict.toUpperCase(), 'badge-defer'];
+      lb.textContent = text;
+      lb.className = 'label-badge ' + cls;
+    } else {
+      lb.textContent = verdict.toUpperCase();
+      lb.className = 'label-badge badge-' + verdict;
+    }
+  } else {
+    lb.style.display = 'none';
+  }
+
+  // Toggle verdict button sets
+  document.getElementById('verdict-buttons').style.display = pairwise ? 'none' : 'grid';
+  document.getElementById('verdict-buttons-pairwise').style.display = pairwise ? 'grid' : 'none';
+
+  // Activate correct verdict buttons
+  if (pairwise) {
+    ['a', 'b', 'same'].forEach(v => {
+      document.getElementById('btn-' + v).classList.toggle('active', verdict === v);
+    });
+  } else {
+    ['pass', 'fail', 'defer'].forEach(v => {
+      document.getElementById('btn-' + v).classList.toggle('active', verdict === v);
+    });
+  }
+
+  // Conversation
+  const wrap = document.getElementById('conversation-wrap');
+  wrap.innerHTML = '';
+
+  if (pairwise) {
+    // Show Prompt → Response A → Response B
+    const addTurn = (cls, labelText, text) => {
+      if (!text) return;
+      const div = document.createElement('div');
+      div.className = 'turn ' + cls;
+      const lbl = document.createElement('div');
+      lbl.className = 'turn-label';
+      lbl.textContent = labelText;
+      const txt = document.createElement('div');
+      txt.textContent = text.trim();
+      div.appendChild(lbl);
+      div.appendChild(txt);
+      wrap.appendChild(div);
+    };
+    addTurn('turn-user', 'Prompt', t.user_input || t.conversation || '');
+    addTurn('turn-response-a', 'Response A (Baseline)', t.response_a || '');
+    addTurn('turn-response-b', 'Response B', t.llm_output || '');
+  } else {
+    const raw = t.conversation || '';
+    const lines = raw.split('\n');
+    let turns = [], cur = null;
+    for (const line of lines) {
+      if (line.startsWith('[AI]')) {
+        if (cur) turns.push(cur);
+        cur = { role: 'ai', text: line.replace(/^\[AI\]\s*/, '') };
+      } else if (line.startsWith('[사용자]')) {
+        if (cur) turns.push(cur);
+        cur = { role: 'user', text: line.replace(/^\[사용자\]\s*/, '') };
+      } else {
+        if (cur) cur.text += '\n' + line;
+        else cur = { role: 'ai', text: line };
+      }
+    }
+    if (cur) turns.push(cur);
+    for (const turn of turns) {
+      const div = document.createElement('div');
+      div.className = 'turn turn-' + turn.role;
+      const lbl = document.createElement('div');
+      lbl.className = 'turn-label';
+      lbl.textContent = turn.role === 'ai' ? 'AI' : '사용자';
+      const txt = document.createElement('div');
+      txt.textContent = turn.text.trim();
+      div.appendChild(lbl);
+      div.appendChild(txt);
+      wrap.appendChild(div);
+    }
+  }
+  wrap.scrollTop = 0;
+
+  document.getElementById('critique-area').value = label.critique || '';
+  const borderlineTypes = new Set(['borderline_pass', 'borderline_fail', 'borderline_a', 'borderline_b', 'borderline_same']);
+  document.getElementById('borderline-checkbox').checked = borderlineTypes.has(label.few_shot_type || '');
+  document.getElementById('save-status').textContent = '';
+  hideNewCategoryInput();
+  const savedCat = label.category || '';
+  if (savedCat && !categories.includes(savedCat)) {
+    categories.push(savedCat);
+    categories.sort();
+  }
+  renderCategorySelect(savedCat);
+  prevCategoryValue = savedCat;
+
+  document.getElementById('btn-prev').disabled = current === 0;
+  document.getElementById('btn-next').disabled = current === traces.length - 1;
+
+  // Update shortcuts for mode
+  document.getElementById('shortcuts').innerHTML = pairwise ? `
+    <div class="shortcut-row"><kbd>←</kbd><kbd>→</kbd> 이전/다음</div>
+    <div class="shortcut-row"><kbd>1</kbd> A 우세 &nbsp; <kbd>2</kbd> B 우세 &nbsp; <kbd>D</kbd> 동점</div>
+    <div class="shortcut-row"><kbd>U</kbd> 실행 취소</div>
+    <div class="shortcut-row"><kbd>⌘ Enter</kbd> 저장 후 다음</div>
+  ` : `
+    <div class="shortcut-row"><kbd>←</kbd><kbd>→</kbd> 이전/다음</div>
+    <div class="shortcut-row"><kbd>1</kbd> Pass &nbsp; <kbd>2</kbd> Fail &nbsp; <kbd>D</kbd> 보류</div>
+    <div class="shortcut-row"><kbd>U</kbd> 실행 취소</div>
+    <div class="shortcut-row"><kbd>⌘ Enter</kbd> 저장 후 다음</div>
+  `;
+
+  const labeled = Object.keys(labels).length;
+  document.getElementById('progress-text').textContent =
+    `${current + 1} / ${traces.length} (라벨링 완료: ${labeled})`;
+  const pct = traces.length ? (labeled / traces.length * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('jump-input').value = current;
+}
+
+// ── Save ──────────────────────────────────────────
+async function saveLabel(pass_fail, critique, category, few_shot_type) {
+  const t = traces[current];
+  if (category === undefined) category = getCurrentCategory();
+  if (few_shot_type === undefined) few_shot_type = getCurrentFewShotType();
+  if (!pass_fail && !critique && !category && !few_shot_type) return;
+  labels[String(t.id)] = { pass_fail, critique, category, few_shot_type };
+  try {
+    await fetch('/review/api/labels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: t.id, pass_fail, critique, category, few_shot_type }),
+    });
+    const s = document.getElementById('save-status');
+    s.textContent = '저장됨 ✓';
+    s.className = 'save-ok';
+    setTimeout(() => { s.textContent = ''; s.className = ''; }, 2000);
+    render();
+  } catch(e) {
+    const s = document.getElementById('save-status');
+    s.textContent = '저장 실패';
+    s.className = 'save-err';
+  }
+}
+
+function getCurrentCritique() {
+  return document.getElementById('critique-area').value;
+}
+
+function getCurrentFewShotType(verdictOverride) {
+  const isChecked = document.getElementById('borderline-checkbox').checked;
+  if (!isChecked) return '';
+  const verdict = verdictOverride || (labels[String(traces[current].id)] || {}).pass_fail || '';
+  if (traces[current] && isPairwiseTrace(traces[current])) {
+    // pairwise: borderline_a / borderline_b / borderline_same
+    if (verdict === 'a') return 'borderline_a';
+    if (verdict === 'b') return 'borderline_b';
+    if (verdict === 'same') return 'borderline_same';
+    return '';
+  }
+  // pointwise: borderline_pass / borderline_fail
+  if (verdict === 'pass') return 'borderline_pass';
+  if (verdict === 'fail') return 'borderline_fail';
+  return '';
+}
+
+function setVerdict(v) {
+  const existing = labels[String(traces[current].id)] || {};
+  lastAction = { id: traces[current].id, prev: { ...existing } };
+  saveLabel(v, getCurrentCritique(), getCurrentCategory(), getCurrentFewShotType(v));
+}
+
+// Auto-save critique (debounced)
+document.getElementById('critique-area').addEventListener('input', () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const existing = labels[String(traces[current].id)] || {};
+    if (existing.pass_fail || getCurrentCritique() || getCurrentCategory() || getCurrentFewShotType()) {
+      saveLabel(existing.pass_fail || null, getCurrentCritique(), getCurrentCategory(), getCurrentFewShotType());
+    }
+  }, 800);
+});
+
+// ── Navigation (with pass/fail guard) ─────────────
+function go(delta) {
+  const next = current + delta;
+  if (next < 0 || next >= traces.length) return;
+
+  // Guard: require pass/fail when moving forward
+  if (delta > 0) {
+    const label = labels[String(traces[current].id)] || {};
+    if (!label.pass_fail) {
+      openModal('no-verdict-modal');
+      return;
+    }
+  }
+  current = next;
+  render();
+}
+
+document.getElementById('btn-prev').addEventListener('click', () => go(-1));
+document.getElementById('btn-next').addEventListener('click', () => go(1));
+document.getElementById('btn-pass').addEventListener('click', () => setVerdict('pass'));
+document.getElementById('btn-fail').addEventListener('click', () => setVerdict('fail'));
+document.getElementById('btn-defer').addEventListener('click', () => setVerdict('defer'));
+document.getElementById('btn-a').addEventListener('click', () => setVerdict('a'));
+document.getElementById('btn-b').addEventListener('click', () => setVerdict('b'));
+document.getElementById('btn-same').addEventListener('click', () => setVerdict('same'));
+
+// ── Jump ──────────────────────────────────────────
+document.getElementById('jump-btn').addEventListener('click', () => {
+  const v = parseInt(document.getElementById('jump-input').value, 10);
+  if (!isNaN(v) && v >= 0 && v < traces.length) {
+    current = v;
+    render();
+  }
+});
+document.getElementById('jump-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('jump-btn').click();
+});
+
+// ── Setup Modal ───────────────────────────────────
+let setupRows = [];
+let setupColumns = [];
+let setupFileName = '';
+
+function openSetupModal() {
+  showSetupStep(1);
+  document.getElementById('setup-step1-error').style.display = 'none';
+  document.getElementById('setup-file-input').value = '';
+  openModal('setup-modal');
+}
+
+function showSetupStep(n) {
+  document.getElementById('setup-step1').style.display = n === 1 ? 'block' : 'none';
+  document.getElementById('setup-step2').style.display = n === 2 ? 'block' : 'none';
+}
+
+async function parseSetupFile(file) {
+  const lowerName = file.name.toLowerCase();
+
+  if (lowerName.endsWith('.json')) {
+    const text = await file.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      throw new Error('JSON 파싱에 실패했습니다.');
+    }
+
+    let rows = [];
+    if (Array.isArray(parsed)) {
+      rows = parsed;
+    } else if (parsed && Array.isArray(parsed.rows)) {
+      rows = parsed.rows;
+    } else if (parsed && Array.isArray(parsed.traces)) {
+      rows = parsed.traces;
+    } else {
+      throw new Error('JSON은 객체 배열이거나 rows/traces 배열을 포함해야 합니다.');
+    }
+
+    if (!rows.length || typeof rows[0] !== 'object' || rows[0] === null || Array.isArray(rows[0])) {
+      throw new Error('JSON 데이터는 행 단위 객체 배열이어야 합니다.');
+    }
+
+    return { rows, columns: Object.keys(rows[0]) };
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        if (!json.length) { reject(new Error('파일에 데이터가 없습니다.')); return; }
+        resolve({ rows: json, columns: Object.keys(json[0]) });
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('파일 읽기 오류'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function renderColumnMappingUI(columns) {
+  const convSel = document.getElementById('setup-col-conv');
+  const userInputSel = document.getElementById('setup-col-user-input');
+  const llmOutputSel = document.getElementById('setup-col-llm-output');
+  const responseASel = document.getElementById('setup-col-response-a');
+  const idSel   = document.getElementById('setup-col-id');
+  convSel.innerHTML = '<option value="">-- 없음 --</option>';
+  userInputSel.innerHTML = '<option value="">-- 없음 --</option>';
+  llmOutputSel.innerHTML = '<option value="">-- 없음 --</option>';
+  responseASel.innerHTML = '<option value="">-- 없음 (pointwise) --</option>';
+  idSel.innerHTML = '<option value="">-- 없음 --</option>';
+  for (const col of columns) {
+    convSel.innerHTML += `<option value="${col}">${col}</option>`;
+    userInputSel.innerHTML += `<option value="${col}">${col}</option>`;
+    llmOutputSel.innerHTML += `<option value="${col}">${col}</option>`;
+    responseASel.innerHTML += `<option value="${col}">${col}</option>`;
+    idSel.innerHTML   += `<option value="${col}">${col}</option>`;
+  }
+  // Auto-guess columns
+  const convGuess = columns.find(c => /conv|대화|message|content/i.test(c));
+  const userInputGuess = columns.find(c => /user[_ ]?input|prompt/i.test(c));
+  const llmOutputGuess = columns.find(c => /llm[_ ]?output|response_b|response(?!_a)|output/i.test(c));
+  const responseAGuess = columns.find(c => /response_a|baseline/i.test(c));
+  if (convGuess) convSel.value = convGuess;
+  if (userInputGuess) userInputSel.value = userInputGuess;
+  if (llmOutputGuess) llmOutputSel.value = llmOutputGuess;
+  if (responseAGuess) responseASel.value = responseAGuess;
+  const idGuess = columns.find(c => /^id$|scenario.*id|trace.*id|^scenario$/i.test(c));
+  if (idGuess) idSel.value = idGuess;
+  renderPreviewTable();
+}
+
+function renderPreviewTable() {
+  const convCol = document.getElementById('setup-col-conv').value;
+  const userInputCol = document.getElementById('setup-col-user-input').value;
+  const llmOutputCol = document.getElementById('setup-col-llm-output').value;
+  const responseACol = document.getElementById('setup-col-response-a').value;
+  const idCol   = document.getElementById('setup-col-id').value;
+  const wrap    = document.getElementById('setup-preview-table-wrap');
+  const preview = setupRows.slice(0, 3);
+  // Show selected cols first, then up to 2 more
+  const selectedCols = [idCol, convCol, userInputCol, llmOutputCol, responseACol].filter(Boolean);
+  const extraCols = setupColumns.filter(c => !selectedCols.includes(c)).slice(0, Math.max(0, 4 - selectedCols.length));
+  const displayCols = [...selectedCols, ...extraCols];
+
+  let html = '<table class="setup-preview-table"><thead><tr>';
+  for (const col of displayCols) {
+    const label = col.length > 18 ? col.slice(0, 16) + '…' : col;
+    html += `<th title="${col}">${label}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (const row of preview) {
+    html += '<tr>';
+    for (const col of displayCols) {
+      const val = String(row[col] ?? '');
+      const disp = val.length > 50 ? val.slice(0, 48) + '…' : val;
+      html += `<td title="${val}">${disp}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function handleSetupFile(file) {
+  const errEl = document.getElementById('setup-step1-error');
+  errEl.style.display = 'none';
+  try {
+    const { rows, columns } = await parseSetupFile(file);
+    setupRows = rows;
+    setupColumns = columns;
+    setupFileName = file.name;
+    document.getElementById('setup-file-info').textContent =
+      `${file.name} — ${rows.length}개 행, ${columns.length}개 컬럼`;
+    renderColumnMappingUI(columns);
+    showSetupStep(2);
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function doSetupUpload() {
+  const convCol = document.getElementById('setup-col-conv').value;
+  const userInputCol = document.getElementById('setup-col-user-input').value;
+  const llmOutputCol = document.getElementById('setup-col-llm-output').value;
+  const responseACol = document.getElementById('setup-col-response-a').value;
+  const idCol   = document.getElementById('setup-col-id').value;
+  const errEl   = document.getElementById('setup-step2-error');
+  const btn     = document.getElementById('setup-confirm-btn');
+  errEl.style.display = 'none';
+  if (!convCol && !(userInputCol && llmOutputCol)) {
+    errEl.textContent = 'conversation 또는 (user_input + llm_output) 컬럼을 선택해주세요.';
+    errEl.style.display = 'block'; return;
+  }
+  btn.disabled = true; btn.textContent = '업로드 중...';
+  try {
+    const res = await fetch('/review/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rows: setupRows,
+        conversation_col: convCol,
+        user_input_col: userInputCol,
+        llm_output_col: llmOutputCol,
+        response_a_col: responseACol,
+        id_col: idCol,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      errEl.textContent = data.error; errEl.style.display = 'block'; return;
+    }
+    closeModal('setup-modal');
+    document.getElementById('upload-info-text').innerHTML =
+      `<strong>${setupFileName}</strong> 파일에서 <strong>${data.count}개</strong>의 트레이스를 불러왔습니다.`;
+    openModal('upload-modal');
+  } catch(err) {
+    errEl.textContent = '업로드 오류: ' + err.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = '업로드';
+  }
+}
+
+// Setup modal events
+document.getElementById('upload-btn').addEventListener('click', openSetupModal);
+
+const dropzone = document.getElementById('setup-dropzone');
+dropzone.addEventListener('click', () => document.getElementById('setup-file-input').click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault(); dropzone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleSetupFile(file);
+});
+document.getElementById('setup-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) handleSetupFile(file);
+});
+document.getElementById('setup-back-btn').addEventListener('click', () => showSetupStep(1));
+document.getElementById('setup-confirm-btn').addEventListener('click', doSetupUpload);
+// Re-render preview when column selects change
+document.getElementById('setup-col-conv').addEventListener('change', renderPreviewTable);
+document.getElementById('setup-col-user-input').addEventListener('change', renderPreviewTable);
+document.getElementById('setup-col-llm-output').addEventListener('change', renderPreviewTable);
+document.getElementById('setup-col-response-a').addEventListener('change', renderPreviewTable);
+document.getElementById('setup-col-id').addEventListener('change', renderPreviewTable);
+
+async function finishUpload(resetLabels) {
+  closeModal('upload-modal');
+  if (resetLabels) {
+    await fetch('/review/api/labels/reset', { method: 'POST' });
+    labels = {};
+    categories = [];
+  }
+  // Reload traces and categories from server
+  [traces, categories] = await Promise.all([
+    fetch(REVIEW_API_BASE + '/traces').then(r => r.json()),
+    fetch(REVIEW_API_BASE + '/categories').then(r => r.json()),
+  ]);
+  current = 0;
+  render();
+  showToast(resetLabels ? '업로드 완료 (라벨 초기화됨)' : '업로드 완료 (기존 라벨 유지)');
+}
+
+document.getElementById('btn-upload-keep').addEventListener('click', () => finishUpload(false));
+document.getElementById('btn-upload-reset').addEventListener('click', () => finishUpload(true));
+
+// ── Export ────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = REVIEW_API_BASE + '/export';
+  a.download = 'labeled.csv';
+  a.click();
+  showToast('CSV 다운로드 시작됨');
+});
+
+// ── AI Settings toggle ────────────────────────────
+document.getElementById('ai-settings-toggle').addEventListener('click', () => {
+  const body = document.getElementById('ai-settings-body');
+  const icon = document.getElementById('ai-toggle-icon');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'flex' : 'none';
+  body.style.flexDirection = 'column';
+  icon.textContent = open ? '▼' : '▶';
+});
+
+// ── AI Improve ────────────────────────────────────
+document.getElementById('btn-ai-improve').addEventListener('click', async () => {
+  const apiKey  = document.getElementById('ai-api-key').value.trim();
+  const model   = document.getElementById('ai-model').value;
+  const draft   = getCurrentCritique();
+  const t       = traces[current];
+  const label   = labels[String(t.id)] || {};
+  const errEl   = document.getElementById('ai-error');
+  const btn     = document.getElementById('btn-ai-improve');
+
+  errEl.style.display = 'none';
+
+  if (!apiKey) { showAiError('API 키를 입력해주세요.'); return; }
+  if (!draft.trim()) { showAiError('개선할 critique를 먼저 입력해주세요.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ 개선 중...';
+
+  try {
+    const res = await fetch('/review/api/improve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        model,
+        conversation: t.conversation,
+        draft,
+        pass_fail: label.pass_fail || '',
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) { showAiError(data.error); return; }
+
+    // Show comparison modal
+    document.getElementById('compare-original').textContent = draft;
+    document.getElementById('improved-edit').value = data.improved;
+    openModal('compare-modal');
+  } catch(e) {
+    showAiError('네트워크 오류: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✦ Critique 개선하기';
+  }
+});
+
+function showAiError(msg) {
+  const el = document.getElementById('ai-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// Apply improved critique
+document.getElementById('btn-apply-improved').addEventListener('click', () => {
+  const improved = document.getElementById('improved-edit').value;
+  document.getElementById('critique-area').value = improved;
+  // Trigger save
+  const existing = labels[String(traces[current].id)] || {};
+  saveLabel(existing.pass_fail || null, improved, getCurrentCategory(), getCurrentFewShotType());
+  closeModal('compare-modal');
+  showToast('개선된 critique가 저장되었습니다.');
+});
+
+// ── Keyboard shortcuts ────────────────────────────
+document.addEventListener('keydown', (e) => {
+  // Block shortcuts when modal is open
+  if (document.querySelector('.modal-overlay.open')) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    }
+    return;
+  }
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      const existing = labels[String(traces[current].id)] || {};
+      saveLabel(existing.pass_fail || null, getCurrentCritique(), getCurrentCategory(), getCurrentFewShotType());
+      setTimeout(() => go(1), 300);
+    }
+    return;
+  }
+  switch (e.key) {
+    case 'ArrowLeft':  go(-1); break;
+    case 'ArrowRight': go(1);  break;
+    case '1':
+      if (traces[current] && isPairwiseTrace(traces[current])) setVerdict('a');
+      else setVerdict('pass');
+      break;
+    case '2':
+      if (traces[current] && isPairwiseTrace(traces[current])) setVerdict('b');
+      else setVerdict('fail');
+      break;
+    case 'd': case 'D':
+      if (traces[current] && isPairwiseTrace(traces[current])) setVerdict('same');
+      else setVerdict('defer');
+      break;
+    case 'u': case 'U':
+      if (lastAction) {
+        labels[String(lastAction.id)] = lastAction.prev;
+        fetch('/review/api/labels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: lastAction.id, category: '', ...lastAction.prev }),
+        });
+        lastAction = null;
+        render();
+        showToast('실행 취소됨');
+      }
+      break;
+    case 'Escape':
+      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+      break;
+  }
+});
+
+// ── Toast ─────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>

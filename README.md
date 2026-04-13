@@ -1,307 +1,135 @@
 # pvm
 
-`pvm` is a local prompt version management tool.
+`pvm`은 로컬에서 프롬프트 버전을 관리하고, 웹 UI에서 비교/평가까지 할 수 있는 도구입니다.
 
-It manages:
+## 설치
 
-- prompt versions per `id`
-- production pointers per prompt
-- prompt diffs
-- production snapshots
-- a Typer-based CLI on top of the Python library
-
-## Install
-
-### Recommended: `pipx`
-
-Use `pipx` if you want `pvm` available like `git`.
-
-CLI only from a local checkout:
+### 1. 레포 clone
 
 ```bash
-pipx install /path/to/pvm
+git clone https://github.com/OWNER/REPO.git
+cd REPO/prompt_versioning_manager
 ```
 
-CLI only from GitHub:
+### 2. `pipx`로 설치
+
+`pvm` 명령어를 전역처럼 편하게 쓰려면 `pipx` 설치를 권장합니다.
 
 ```bash
-pipx install "git+https://github.com/OWNER/REPO.git@main"
+pipx install .
 ```
 
-CLI + server from the package root:
-
-```bash
-pipx install ".[server]"
-```
-
-Upgrade after changes:
+개발 중 다시 설치할 때:
 
 ```bash
 pipx reinstall pvm
 ```
 
-If you installed the server extra, reinstall with the same spec:
+GitHub에서 바로 설치하려면:
 
 ```bash
-pipx reinstall "pvm[server] @ git+https://github.com/OWNER/REPO.git@main"
+pipx install "git+https://github.com/OWNER/REPO.git@main#subdirectory=prompt_versioning_manager"
 ```
 
-If you publish version bumps, `pipx upgrade pvm` works as well.
+## 빠른 시작
 
-### Local development with Poetry
-
-```bash
-poetry install -E dev
-poetry run pvm --help
-```
-
-For CLI + server development:
+프로젝트 작업 디렉토리로 이동한 뒤 초기화합니다.
 
 ```bash
-poetry install -E dev -E server
-poetry run pvm-server --help
-```
-
-### Build a distributable package
-
-```bash
-poetry build
-```
-
-This creates:
-
-- `dist/pvm-0.0.0-py3-none-any.whl`
-- `dist/pvm-0.0.0.tar.gz`
-
-You can install the wheel with:
-
-```bash
-pipx install dist/pvm-0.0.0-py3-none-any.whl
-```
-
-## Quick Start
-
-### CLI
-
-Initialize a project in the current directory. If `name` is omitted, `my-project` is used.
-
-```bash
+mkdir my-prompt-project
+cd my-prompt-project
 pvm init
 ```
 
-Print the default prompt template:
+기본 템플릿을 보고 싶으면:
 
 ```bash
 pvm template
 ```
 
-Save a prompt YAML file and add it:
+예시 `prompt.yaml`
+
+```yaml
+id: intent_classifier
+description: 사용자 의도를 분류하는 프롬프트
+author: alice
+
+llm:
+  provider: openai
+  model: gpt-4.1
+
+prompt: |
+  사용자의 입력을 보고 의도를 분류하세요.
+```
+
+프롬프트 추가:
 
 ```bash
 pvm add prompt.yaml
 ```
 
-Minor and major bumps are supported:
-
-```bash
-pvm add prompt.yaml --minor
-pvm add prompt.yaml --major
-```
-
-Deploy the latest version for a prompt:
+배포 버전 지정:
 
 ```bash
 pvm deploy intent_classifier
 ```
 
-Deploy a specific version:
-
-```bash
-pvm deploy intent_classifier 0.1.0
-```
-
-Read a prompt:
+현재 프롬프트 조회:
 
 ```bash
 pvm get intent_classifier
-pvm get intent_classifier --version 0.1.0
 ```
 
-Create snapshots:
+스냅샷 생성:
 
 ```bash
 pvm snapshot create
-pvm snapshot create --minor
-pvm snapshot create --major
 ```
 
-Inspect the project summary:
+## 웹 UI
+
+프로젝트 디렉토리에서 실행:
 
 ```bash
+pvm ui
+```
+
+브라우저에서 아래 주소로 접속하면 됩니다.
+
+```text
+http://127.0.0.1:8001
+```
+
+웹 UI에서는 다음 작업을 할 수 있습니다.
+
+- 프롬프트 목록 조회
+- 버전별 내용 확인
+- diff 확인
+- deploy / rollback
+- snapshot 생성 및 비교
+- Judge eval 실행
+
+Judge eval 파이프라인은 패키지 안에 번들되어 있어서, 별도로 `judge-prompt-generation` 레포를 받을 필요가 없습니다.
+
+## 자주 쓰는 명령어
+
+```bash
+pvm init
+pvm template
+pvm add prompt.yaml
+pvm add prompt.yaml --minor
+pvm add prompt.yaml --major
+pvm list
+pvm get <PROMPT_ID>
+pvm deploy <PROMPT_ID>
+pvm rollback <PROMPT_ID>
+pvm snapshot create
 pvm project
+pvm ui
 ```
 
-### Server
+## 참고
 
-Install the server extra first if you want the web UI and API:
-
-```bash
-pipx install ".[server]"
-```
-
-Run the server on the default port:
-
-```bash
-pvm-server
-```
-
-The default bind address is `127.0.0.1`, so open:
-
-```text
-http://127.0.0.1:8888
-```
-
-Run the server on a custom port:
-
-```bash
-pvm-server --port 9000
-```
-
-Then open:
-
-```text
-http://127.0.0.1:9000
-```
-
-Bind a different host or enable reload for local development:
-
-```bash
-pvm-server --host 127.0.0.1 --port 9000
-pvm-server --host 0.0.0.0 --port 9000
-pvm-server --port 9000 --reload
-```
-
-Optional environment variables:
-
-- `PVM_STORAGE_ROOT` to override the project storage directory
-- `PVM_DB_PATH` to override the SQLite database path
-
-## Prompt Template
-
-The default YAML template is:
-
-```yaml
-id: "intent_classifier"
-description: "Classify the user's intent"
-author: "alice"
-
-llm:
-  provider: "openai"
-  model: "gpt-4.1"
-  params:
-    temperature: 0.2
-    max_tokens: 300
-
-prompt: |
-  Classify the user's intent.
-
-input_variables:
-  - user_input
-  - history
-```
-
-Required fields:
-
-- `id`
-- `llm`
-- `prompt`
-
-Rules:
-
-- `id` is the stable prompt identifier
-- `id` cannot contain spaces or `/`
-- the first version is always `0.1.0`
-- identical content is a no-op
-
-## Project Layout
-
-After `pvm init`, the project contains a local `.pvm/` directory.
-
-```text
-.pvm/
-  config.yaml
-  settings/
-    template.yaml
-  prompts/
-    {id}/
-      info.yaml
-      production.json
-      history.jsonl
-      versions/
-        {version}/
-          prompt.md
-          model_config.json
-          metadata.json
-          template.yaml
-  snapshots/
-    history.jsonl
-    versions/
-      {version}.json
-```
-
-## Current Command Set
-
-Top-level commands:
-
-- `pvm init [name]`
-- `pvm add <file> [--minor|--major]`
-- `pvm deploy <id> [version]`
-- `pvm rollback <id>`
-- `pvm get <id> [--version <version>]`
-- `pvm diff <id> <from_version> <to_version>`
-- `pvm list [--id <id>]`
-- `pvm id <id> [--info] [--list]`
-- `pvm log [--id <id>]`
-- `pvm project`
-- `pvm template`
-
-Snapshot commands:
-
-- `pvm snapshot create [--minor|--major]`
-- `pvm snapshot list`
-- `pvm snapshot get <version>`
-- `pvm snapshot read <version>`
-- `pvm snapshot diff <from_version> <to_version>`
-
-Server command:
-
-- `pvm-server [--host <host>] [--port <port>] [--reload]`
-
-Detailed CLI examples are in `docs/CLI.md`.
-
-Additional documents:
-
-- Korean README: `docs/README_KO.md`
-- Korean CLI guide: `docs/CLI_KO.md`
-- Design: `docs/DESIGN.md`
-- Implementation status: `docs/IMPLEMENTATION_TODO.md`
-
-## Command Behavior Notes
-
-- `pvm init` defaults the project name to `my-project`
-- `pvm add` defaults to a patch bump; `--minor` and `--major` are mutually exclusive
-- the first prompt version is always `0.1.0`
-- `pvm deploy <id>` deploys the latest version if `version` is omitted
-- redeploying the current production version is a no-op
-- `pvm get <id>` returns production if it exists, otherwise the latest version
-- `pvm get <id> --version <version>` is strict and errors if that version does not exist
-- the first snapshot version is always `0.1.0`
-- `pvm project` shows the project, prompt ids, prompt versions, production markers, and snapshot versions
-
-## Testing
-
-Run the test suite with Poetry:
-
-```bash
-poetry run python -m pytest -q
-```
+- Python 3.11 이상이 필요합니다.
+- 작업 데이터는 현재 디렉토리의 `.pvm/` 아래에 저장됩니다.
+- 첫 버전은 항상 `0.1.0`부터 시작합니다.

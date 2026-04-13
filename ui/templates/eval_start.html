@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}pvm - 평가 시작{% endblock %}
+{% block content %}
+<div class="p-8 max-w-2xl">
+
+  <div class="mb-6">
+    <a href="/prompts/{{ info.id }}/version/{{ version }}"
+       class="text-sm text-gray-400 hover:text-gray-600">← {{ info.id }} v{{ version }}</a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-2">새 Judge 평가</h1>
+    <p class="text-sm text-gray-500 mt-1">CSV 파일과 시스템 프롬프트로 Judge 평가 파이프라인을 실행합니다.</p>
+  </div>
+
+  <!-- PVM 연동 정보 -->
+  <div class="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg flex items-start gap-3">
+    <span class="text-lg mt-0.5">🔗</span>
+    <div>
+      <p class="text-sm font-semibold text-indigo-800">PVM 버전 연동</p>
+      <p class="text-xs text-indigo-600 mt-0.5">
+        <span class="font-mono">{{ info.id }}</span>
+        <span class="mx-1">·</span>
+        v{{ version }}
+      </p>
+      <p class="text-xs text-indigo-500 mt-1">시스템 프롬프트가 자동으로 연결됩니다. CSV를 업로드하면 평가가 시작됩니다.</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <p class="text-sm font-semibold text-red-700 mb-1">❌ Step 0 실행 오류</p>
+    <pre class="text-xs text-red-600 whitespace-pre-wrap overflow-auto max-h-40 font-mono">{{ error }}</pre>
+  </div>
+  {% endif %}
+
+  <form method="post"
+        action="/prompts/{{ info.id }}/version/{{ version }}/eval/start"
+        enctype="multipart/form-data"
+        class="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+
+    <input type="hidden" name="judge_type" value="pointwise">
+    <input type="hidden" name="reuse_run_hash" id="reuse-run-hash" value="">
+    <input type="hidden" name="reuse_from_version" id="reuse-from-version" value="">
+
+    <!-- Criteria 재사용 -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <label class="text-sm font-medium text-gray-700">이전 Criteria 재사용</label>
+        <button type="button" id="reuse-toggle"
+                onclick="toggleReuse()"
+                class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-200 transition-colors focus:outline-none">
+          <span id="reuse-thumb"
+                class="inline-block h-3.5 w-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform"></span>
+        </button>
+      </div>
+      <p class="text-xs text-gray-400">Step 1/2를 건너뛰고 이전에 생성한 criteria로 바로 Judge를 실행합니다.</p>
+
+      <div id="reuse-panel" class="hidden mt-3">
+        <div id="reuse-loading" class="text-xs text-gray-400">목록 불러오는 중...</div>
+        <div id="reuse-empty" class="hidden text-xs text-orange-500">
+          이 Prompt에 재사용 가능한 criteria가 없습니다. (Step 2까지 완료된 평가 실행 필요)
+        </div>
+        <select id="reuse-select"
+                class="hidden w-full text-sm border border-gray-300 rounded-lg px-3 py-2
+                       focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                onchange="onReuseSelect(this)">
+          <option value="">-- 재사용할 criteria 선택 --</option>
+        </select>
+        <div id="reuse-preview" class="hidden mt-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-700 leading-relaxed"></div>
+      </div>
+    </div>
+
+    <!-- LLM 설정 -->
+    <div class="space-y-3">
+      <label class="block text-sm font-medium text-gray-700">Judge LLM</label>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Provider</label>
+          <select id="provider-select" name="provider"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">모델</label>
+          <select id="model-select" name="model"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSV 업로드 -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        레이블링된 CSV 파일 <span class="text-red-500">*</span>
+      </label>
+      <input type="file" name="csv_file" accept=".csv" required
+             class="w-full text-sm text-gray-600 border border-gray-300 rounded-lg px-3 py-2
+                    file:mr-3 file:py-1 file:px-3 file:rounded file:border-0
+                    file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100">
+      <p class="text-xs text-gray-400 mt-1">컬럼: trace_id, user_input, llm_output, pass_fail, critique 등</p>
+    </div>
+
+    <!-- 시스템 프롬프트 미리보기 -->
+    {% if prompt_data %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">시스템 프롬프트 (v{{ version }})</label>
+      <pre class="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 font-mono whitespace-pre-wrap
+                  max-h-32 overflow-y-auto border border-gray-200">{{ prompt_data.prompt[:500] }}{% if prompt_data.prompt | length > 500 %}...{% endif %}</pre>
+    </div>
+    {% endif %}
+
+    <div class="flex justify-end gap-3 pt-2">
+      <a href="/prompts/{{ info.id }}/version/{{ version }}"
+         class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</a>
+      <button type="submit"
+              class="px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg
+                     hover:bg-indigo-500 transition">
+        Config 생성 →
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+const MODELS = {
+  openai: [
+    { value: "gpt-4.1",   label: "GPT-4.1" },
+    { value: "gpt-4o",    label: "GPT-4o" },
+    { value: "o4-mini",   label: "o4-mini" },
+    { value: "o3-mini",   label: "o3-mini" },
+  ],
+  anthropic: [
+    { value: "claude-opus-4-6",           label: "Claude Opus 4.6" },
+    { value: "claude-sonnet-4-6",         label: "Claude Sonnet 4.6" },
+    { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+  ],
+  gemini: [
+    { value: "gemini-2.5-pro",   label: "Gemini 2.5 Pro" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  ],
+};
+const providerSelect = document.getElementById('provider-select');
+const modelSelect    = document.getElementById('model-select');
+function onProviderChange() {
+  const models = MODELS[providerSelect.value] || [];
+  modelSelect.innerHTML = '';
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.value; opt.textContent = m.label;
+    modelSelect.appendChild(opt);
+  });
+}
+providerSelect.addEventListener('change', onProviderChange);
+onProviderChange();
+
+// ── Criteria 재사용 ──
+let _reuseOn = false;
+let _reuseRuns = [];
+
+function toggleReuse() {
+  _reuseOn = !_reuseOn;
+  const toggle = document.getElementById('reuse-toggle');
+  const thumb  = document.getElementById('reuse-thumb');
+  const panel  = document.getElementById('reuse-panel');
+  toggle.classList.toggle('bg-indigo-500', _reuseOn);
+  toggle.classList.toggle('bg-gray-200', !_reuseOn);
+  thumb.classList.toggle('translate-x-4', _reuseOn);
+  thumb.classList.toggle('translate-x-0.5', !_reuseOn);
+  panel.classList.toggle('hidden', !_reuseOn);
+  if (_reuseOn && _reuseRuns.length === 0) loadReuseRuns();
+  if (!_reuseOn) clearReuse();
+}
+
+function loadReuseRuns() {
+  const loadingEl = document.getElementById('reuse-loading');
+  const emptyEl   = document.getElementById('reuse-empty');
+  const selectEl  = document.getElementById('reuse-select');
+  loadingEl.classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+  selectEl.classList.add('hidden');
+
+  fetch('/prompts/{{ info.id }}/version/{{ version }}/eval/api/reusable-runs')
+    .then(r => r.json())
+    .then(runs => {
+      _reuseRuns = runs;
+      loadingEl.classList.add('hidden');
+      if (runs.length === 0) { emptyEl.classList.remove('hidden'); return; }
+      selectEl.innerHTML = '<option value="">-- 재사용할 criteria 선택 --</option>';
+      runs.forEach((r, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `v${r.version}  |  ${r.created_at}  |  ${r.judge_provider}/${r.judge_model}  |  ${r.hash.slice(0,8)}`;
+        selectEl.appendChild(opt);
+      });
+      selectEl.classList.remove('hidden');
+    })
+    .catch(() => { loadingEl.classList.add('hidden'); emptyEl.classList.remove('hidden'); });
+}
+
+function onReuseSelect(sel) {
+  const previewEl = document.getElementById('reuse-preview');
+  if (!sel.value) { clearReuse(); return; }
+  const run = _reuseRuns[parseInt(sel.value)];
+  document.getElementById('reuse-run-hash').value = run.hash;
+  document.getElementById('reuse-from-version').value = run.version;
+  if (run.criteria_preview) {
+    previewEl.textContent = run.criteria_preview;
+    previewEl.classList.remove('hidden');
+  } else {
+    previewEl.classList.add('hidden');
+  }
+}
+
+function clearReuse() {
+  document.getElementById('reuse-run-hash').value = '';
+  document.getElementById('reuse-from-version').value = '';
+  document.getElementById('reuse-preview').classList.add('hidden');
+  const sel = document.getElementById('reuse-select');
+  if (sel) sel.value = '';
+}
+</script>
+{% endblock %}

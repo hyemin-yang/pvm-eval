@@ -16,6 +16,10 @@ dependencies = [
   "jinja2>=3.1",
   "python-multipart>=0.0.9",
   "tiktoken>=0.8",
+  "pandas>=2.0.0",
+  "anthropic>=0.30.0",
+  "openai>=1.50.0",
+  "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -39,10 +43,7 @@ where = ["."]
 include = ["pvm*", "server*", "ui*"]
 
 [tool.setuptools.package-data]
-server = [
-  "ui/static/**/*",
-  "ui/templates/**/*",
-]
+"pvm" = ["eval_pipeline/prompts/*.md"]
 ui = [
   "static/**/*",
   "templates/**/*",

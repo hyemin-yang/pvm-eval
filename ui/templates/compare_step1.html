@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}pvm - Compare Step 1 · {{ info.id }}{% endblock %}
+{% block content %}
+<div class="p-8 max-w-4xl">
+
+  <div class="mb-6">
+    <a href="/prompts/{{ info.id }}"
+       class="text-sm text-gray-400 hover:text-gray-600">← {{ info.id }}</a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-2">버전 비교</h1>
+    <p class="text-sm text-gray-400 mt-1">
+      <span class="font-semibold text-gray-600">v{{ version_a }}</span>
+      <span class="mx-1.5 text-gray-300">vs</span>
+      <span class="font-semibold text-gray-600">v{{ version_b }}</span>
+      <span class="mx-1.5">·</span>
+      <span class="font-mono">{{ compare_hash }}</span>
+      {% if created_at %}<span class="mx-1.5">·</span>{{ created_at }}{% endif %}
+    </p>
+  </div>
+
+  <!-- 스텝 인디케이터 -->
+  {% set steps = [
+    ('에러 분석',      compare_url_base ~ '/step1', step_status.step1, true),
+    ('Judge 프롬프트', compare_url_base ~ '/step2', step_status.step2, step_status.step1),
+    ('Judge 실행',     compare_url_base ~ '/step3', step_status.step3, step_status.step2),
+    ('리포트',         compare_url_base ~ '/report', false,            step_status.step3),
+  ] %}
+  <div class="flex items-center gap-0 mb-8">
+    {% for label, href, done, accessible in steps %}
+    {% set i = loop.index0 %}
+    {% set is_current = i == 0 %}
+    {% if i > 0 %}
+    <div class="flex-1 h-px {% if steps[i-1][2] %}bg-green-400{% else %}bg-gray-200{% endif %}"></div>
+    {% endif %}
+    <a href="{{ href if accessible else '#' }}"
+       class="flex flex-col items-center gap-1 {% if not accessible %}pointer-events-none{% endif %}">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition
+                  {% if is_current %}ring-2 ring-indigo-500 ring-offset-2 bg-indigo-600 text-white
+                  {% elif done %}bg-green-500 text-white
+                  {% else %}bg-gray-200 text-gray-400{% endif %}">
+        {% if done and not is_current %}✓{% else %}{{ loop.index }}{% endif %}
+      </div>
+      <span class="text-xs whitespace-nowrap
+                   {% if is_current %}text-indigo-600 font-semibold
+                   {% elif done %}text-gray-600
+                   {% else %}text-gray-400{% endif %}">{{ label }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- 본문 카드 -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-semibold">에러 분석</h2>
+        <p class="text-sm text-gray-500 mt-0.5">pairwise 데이터로 비교 기준(criteria)과 judge 규칙을 도출합니다.</p>
+      </div>
+      {% if not is_running %}
+      <form method="post" action="{{ compare_url_base }}/step1/run">
+        <button type="submit"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg
+                       hover:bg-indigo-500 transition whitespace-nowrap">
+          {% if step_status.step1 %}↺ 재실행{% else %}▶ 실행{% endif %}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if is_running %}
+
+    <div class="mb-6 border border-amber-300 bg-amber-50 rounded-xl p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+        <span class="text-sm font-semibold text-amber-800">실행 중...</span>
+        <span id="elapsed-label" class="text-xs text-amber-600 ml-1"></span>
+        <form method="post" action="{{ compare_url_base }}/step1/stop" class="ml-auto"
+              onsubmit="return confirm('실행을 중지하시겠습니까?')">
+          <button type="submit"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700
+                         text-xs font-semibold rounded-lg hover:bg-red-200 transition border border-red-200">
+            ⏹ 중지
+          </button>
+        </form>
+      </div>
+      <pre id="live-log"
+           class="text-xs font-mono bg-gray-900 text-green-300 rounded-lg p-4
+                  h-56 overflow-auto whitespace-pre-wrap leading-relaxed">{{ run_log or '로그를 기다리는 중...' }}</pre>
+    </div>
+
+    {% elif result %}
+
+    {% if run_log %}
+    <details class="mb-6">
+      <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">
+        마지막 실행 로그 보기
+      </summary>
+      <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-3
+                  whitespace-pre-wrap overflow-auto max-h-48 text-gray-600">{{ run_log }}</pre>
+    </details>
+    {% endif %}
+
+    {% set categories = result.get('categories', []) %}
+    <div class="space-y-3">
+      <p class="text-sm text-gray-500">
+        총 <strong>{{ categories | length }}</strong>개 카테고리 도출
+        ({{ categories | selectattr('action', 'eq', 'judge_prompt') | list | length }}개 Judge 대상)
+      </p>
+      {% for cat in categories %}
+      <div class="border border-gray-200 rounded-lg p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-sm">{{ cat.name or cat.category_name or cat.id }}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium
+                {% if cat.action == 'judge_prompt' %}bg-green-100 text-green-700
+                {% elif cat.action == 'code_check' %}bg-yellow-100 text-yellow-700
+                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                {{ cat.action }}
+              </span>
+            </div>
+            <p class="text-sm text-gray-600">{{ cat.definition or cat.description or '' }}</p>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-400 py-4 text-center">카테고리가 없습니다.</p>
+      {% endfor %}
+    </div>
+
+    <div class="mt-6 flex justify-end">
+      <a href="{{ compare_url_base }}/step2"
+         class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-700 transition">
+        다음: Judge 프롬프트 생성 →
+      </a>
+    </div>
+
+    {% else %}
+
+    {% if run_log %}
+    <div class="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+      <p class="text-sm font-semibold text-red-700 mb-2">❌ 마지막 실행이 실패했습니다</p>
+      <pre class="text-xs font-mono bg-gray-900 text-red-300 rounded-lg p-4
+                  h-48 overflow-auto whitespace-pre-wrap leading-relaxed">{{ run_log }}</pre>
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-400">
+      <div class="text-4xl mb-3">🔍</div>
+      <p class="text-sm">아직 에러 분석이 실행되지 않았습니다.</p>
+      <p class="text-xs mt-1">위 실행 버튼을 클릭하면 LLM이 비교 기준을 분석합니다.</p>
+    </div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+
+</div>
+
+{% if is_running %}
+<script>
+(function () {
+  const logEl = document.getElementById('live-log');
+  const elapsedEl = document.getElementById('elapsed-label');
+  let startTime = Date.now();
+  function formatElapsed(ms) {
+    const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+    return m > 0 ? `${m}분 ${s % 60}초` : `${s}초`;
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+  const timer = setInterval(() => {
+    elapsedEl.textContent = '(' + formatElapsed(Date.now() - startTime) + ' 경과)';
+  }, 1000);
+  function poll() {
+    fetch('{{ compare_url_base }}/step1/status')
+      .then(r => r.json())
+      .then(data => {
+        if (data.log) { logEl.textContent = data.log; logEl.scrollTop = logEl.scrollHeight; }
+        if (data.status === 'running') { setTimeout(poll, 2000); }
+        else { clearInterval(timer); setTimeout(() => location.reload(), 1000); }
+      })
+      .catch(() => setTimeout(poll, 3000));
+  }
+  setTimeout(poll, 2000);
+})();
+</script>
+{% endif %}
+{% endblock %}
