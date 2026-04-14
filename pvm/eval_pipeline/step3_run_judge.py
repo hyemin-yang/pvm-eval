@@ -26,6 +26,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 from judge_composer import JudgePromptComposer, load_components
 from llm_client import create_client
+from pvm_storage import select_judge_component_file
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -127,16 +128,10 @@ def run(config_path: str) -> None:
 
     # ── 컴포넌트 로드 ─────────────────────────────────────────────────────
     comp_dir = output_dir / "judge_components"
-    comp_candidates = sorted(
-        [p for p in comp_dir.glob("*_judge.yaml") if p.stem.endswith("_judge")],
-        key=lambda p: p.stat().st_mtime, reverse=True,
-    ) if comp_dir.exists() else []
-    if not comp_candidates:
-        comp_candidates = sorted(comp_dir.glob("*_judge.yaml"), key=lambda p: p.stat().st_mtime, reverse=True) if comp_dir.exists() else []
-    if not comp_candidates:
+    comp_path = select_judge_component_file(output_dir)
+    if comp_path is None:
         print(f"❌ Judge 컴포넌트 없음: {comp_dir}", flush=True)
         sys.exit(1)
-    comp_path = comp_candidates[0]
     print(f"[Step3] 컴포넌트 파일: {comp_path.name}", flush=True)
     components = load_components(comp_path)
     print(f"[Step3] 컴포넌트 로드 (few-shot: {len(components.few_shot)}개)", flush=True)

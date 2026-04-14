@@ -16,6 +16,8 @@ from typing import IO
 
 import yaml
 
+from pvm.eval_pipeline.pvm_storage import select_judge_component_file
+
 # ── 전역 상태 ────────────────────────────────────────────────────────────────
 
 _running_jobs: dict[str, tuple[subprocess.Popen, IO]] = {}
@@ -196,25 +198,17 @@ def load_json(run_dir: Path, filename: str) -> dict | None:
 
 
 def load_step2_yaml(run_dir: Path) -> dict | None:
-    comp_dir = run_dir / "judge_components"
-    if not comp_dir.exists():
+    comp_file = select_judge_component_file(run_dir)
+    if comp_file is None:
         return None
-    all_files = list(comp_dir.glob("*_judge.yaml"))
-    if not all_files:
-        return None
-    main = [p for p in all_files if p.stem.endswith("_judge")]
-    candidates = sorted(main or all_files, key=lambda p: p.stat().st_mtime, reverse=True)
-    with open(candidates[0], encoding="utf-8") as f:
+    with open(comp_file, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def get_run_status(run_dir: Path) -> dict:
     """어느 단계까지 완료됐는지 반환."""
     step1 = (run_dir / "error_analysis.json").exists()
-    step2 = (
-        any((run_dir / "judge_components").glob("*_judge.yaml"))
-        if (run_dir / "judge_components").exists() else False
-    )
+    step2 = select_judge_component_file(run_dir) is not None
     step3 = (run_dir / "judge_results.json").exists()
     return {"step1": step1, "step2": step2, "step3": step3}
 

@@ -60,6 +60,46 @@ def judge_run_dir(pvm_root: Path, prompt_id: str, version: str, pipeline_hash: s
     return pvm_root / "prompts" / prompt_id / "versions" / version / "judge" / pipeline_hash
 
 
+def select_judge_component_file(run_dir: Path) -> Path | None:
+    """Return the most appropriate judge component YAML for a run.
+
+    Preference order:
+    1. `judge_components/judge.yaml` - canonical editable file
+    2. Latest non-timestamp `*_judge.yaml`
+    3. Latest timestamped `*_judge_*.yaml`
+    4. Any latest YAML file in `judge_components/`
+    """
+    comp_dir = run_dir / "judge_components"
+    if not comp_dir.exists():
+        return None
+
+    canonical = comp_dir / "judge.yaml"
+    if canonical.exists():
+        return canonical
+
+    direct_candidates = sorted(
+        [p for p in comp_dir.glob("*_judge.yaml") if p.stem.endswith("_judge")],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if direct_candidates:
+        return direct_candidates[0]
+
+    snapshot_candidates = sorted(
+        comp_dir.glob("*_judge_*.yaml"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if snapshot_candidates:
+        return snapshot_candidates[0]
+
+    any_yaml = sorted(comp_dir.glob("*.yaml"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if any_yaml:
+        return any_yaml[0]
+
+    return None
+
+
 def get_csv_path(pvm_root: Path, csv_hash: str) -> Path:
     """등록된 CSV 파일 경로를 반환한다."""
     return pvm_root / "datasets" / csv_hash / "data.csv"

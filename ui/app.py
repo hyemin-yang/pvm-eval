@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from pvm.core.errors import PVMError
+from pvm.eval_pipeline.pvm_storage import select_judge_component_file
 from pvm.project import PVMProject
 from pvm.storage.history import read_history
 from pvm.storage.yaml_io import dump_yaml
@@ -851,7 +852,8 @@ def _eval_runs_with_criteria(project, prompt_id: str) -> list:
                 continue
             # step2 완료 여부 확인
             comp_dir = run_dir / "judge_components"
-            if not comp_dir.exists() or not any(comp_dir.glob("*_judge.yaml")):
+            comp_file = select_judge_component_file(run_dir)
+            if comp_file is None:
                 continue
             meta: dict = {}
             meta_path = run_dir / "pipeline_meta.json"
@@ -861,12 +863,11 @@ def _eval_runs_with_criteria(project, prompt_id: str) -> list:
                 except Exception:
                     pass
             # criteria 미리보기: judge_components yaml에서 criteria 텍스트 앞부분
-            comp_files = list(comp_dir.glob("*_judge.yaml"))
             criteria_preview = ""
-            if comp_files:
+            if comp_file is not None:
                 try:
                     import yaml as _yaml
-                    comp_data = _yaml.safe_load(comp_files[0].read_text(encoding="utf-8"))
+                    comp_data = _yaml.safe_load(comp_file.read_text(encoding="utf-8"))
                     raw = comp_data.get("criteria", "") or ""
                     criteria_preview = raw[:120].replace("\n", " ") + ("..." if len(raw) > 120 else "")
                 except Exception:
