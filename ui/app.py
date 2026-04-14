@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,11 @@ UI_DIR = Path(__file__).parent
 app = FastAPI(title="pvm ui")
 app.mount("/static", StaticFiles(directory=UI_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=UI_DIR / "templates")
+templates.env.globals["api_keys_missing"] = lambda: not any([
+    os.environ.get("ANTHROPIC_API_KEY"),
+    os.environ.get("OPENAI_API_KEY"),
+    os.environ.get("GEMINI_API_KEY"),
+])
 
 _project: PVMProject | None = None
 
@@ -1858,6 +1864,89 @@ def pvm_error_handler(request: Request, exc: PVMError):
 
 # --- Entry point ---
 
+def _pvm_api_keys_path(project) -> Path:
+    return project.root / ".pvm" / "api_keys.env"
+
+
+def _load_api_keys_env(keys_path: Path) -> None:
+    """api_keys.env 파일의 키를 os.environ에 로드 (이미 설정된 키는 덮어쓰지 않음)."""
+    if not keys_path.exists():
+        return
+    for line in keys_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        k, _, v = line.partition("=")
+        k = k.strip()
+        if k and not os.environ.get(k):
+            os.environ[k] = v.strip()
+
+
+def _get_api_key_status() -> dict:
+    return {
+        "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "openai": bool(os.environ.get("OPENAI_API_KEY")),
+        "gemini": bool(os.environ.get("GEMINI_API_KEY")),
+    }
+
+
+# --- Settings ---
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, saved: str = ""):
+    project = get_project()
+    key_status = _get_api_key_status()
+    return _render(request, "settings.html", key_status=key_status, saved=bool(saved))
+
+
+@app.post("/settings/api-keys")
+async def save_api_keys(
+    request: Request,
+    anthropic_key: str = Form(""),
+    openai_key: str = Form(""),
+    gemini_key: str = Form(""),
+):
+    project = get_project()
+    keys_path = _pvm_api_keys_path(project)
+
+    # 기존 키 읽기
+    existing: dict[str, str] = {}
+    if keys_path.exists():
+        for line in keys_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            k, _, v = line.partition("=")
+            if k.strip():
+                existing[k.strip()] = v.strip()
+
+    # 새 값 반영 (빈 칸이면 변경 안 함)
+    if anthropic_key.strip():
+        existing["ANTHROPIC_API_KEY"] = anthropic_key.strip()
+    if openai_key.strip():
+        existing["OPENAI_API_KEY"] = openai_key.strip()
+    if gemini_key.strip():
+        existing["GEMINI_API_KEY"] = gemini_key.strip()
+
+    keys_path.write_text(
+        "\n".join(f"{k}={v}" for k, v in existing.items()) + "\n",
+        encoding="utf-8",
+    )
+
+    # 현재 프로세스 env에도 즉시 반영
+    for k, v in existing.items():
+        os.environ[k] = v
+
+    # .gitignore에 api_keys.env 추가 (없으면)
+    gitignore = project.root / ".gitignore"
+    entry = ".pvm/api_keys.env"
+    if not gitignore.exists() or entry not in gitignore.read_text(encoding="utf-8"):
+        with open(gitignore, "a", encoding="utf-8") as gf:
+            gf.write(f"\n{entry}\n")
+
+    return RedirectResponse("/settings?saved=1", status_code=303)
+
+
 def run(
     root: str | Path = ".",
     host: str = "127.0.0.1",
@@ -1871,6 +1960,9 @@ def run(
     _project = PVMProject(root)
     # eval_pipeline_dir 인자는 하위 호환성을 위해 유지하지만 번들된 파이프라인 사용
     print(f"eval pipeline: bundled ({get_pipeline_dir()})")
+
+    # UI에서 저장된 API 키 로드
+    _load_api_keys_env(_pvm_api_keys_path(_project))
 
     url = f"http://{host}:{port}"
     print(f"pvm ui: {url}")

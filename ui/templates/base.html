@@ -33,11 +33,26 @@
       <a href="/prompts" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition sidebar-nav-item">
         <span class="sidebar-icon">📝</span> Prompt
       </a>
-<a href="/tree" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition sidebar-nav-item">
+      <a href="/tree" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition sidebar-nav-item">
         <span class="sidebar-icon">🌲</span> Tree
       </a>
+
+      <!-- API Key Settings -->
+      <a href="/settings"
+         class="flex items-start gap-3 px-4 py-3 rounded-lg transition sidebar-nav-item
+                {% if api_keys_missing() %}bg-yellow-900/40 text-yellow-300 hover:bg-yellow-900/60
+                {% else %}text-gray-300 hover:bg-gray-800 hover:text-white{% endif %}">
+        <span class="sidebar-icon mt-0.5">🔑</span>
+        <span class="flex-1 leading-tight">
+          <span class="block text-sm font-medium">API Key 설정</span>
+          <span class="block text-xs mt-0.5
+                       {% if api_keys_missing() %}text-yellow-400{% else %}text-gray-500{% endif %}">
+            {% if api_keys_missing() %}⚠ 키 미설정 — 클릭하여 입력{% else %}Judge 평가용 API 키{% endif %}
+          </span>
+        </span>
+      </a>
     </nav>
-    <div class="px-4 pb-5">
+    <div class="px-4 pb-5 mt-2">
       <a href="/prompts/add" class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-gray-600 text-gray-400 hover:border-green-400 hover:text-green-400 transition sidebar-nav-item">
         + Prompt 추가
       </a>
