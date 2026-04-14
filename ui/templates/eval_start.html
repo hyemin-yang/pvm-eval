@@ -129,20 +129,26 @@
 <script>
 const MODELS = {
   openai: [
-    { value: "gpt-4.1",   label: "GPT-4.1" },
-    { value: "gpt-4o",    label: "GPT-4o" },
-    { value: "o4-mini",   label: "o4-mini" },
-    { value: "o3-mini",   label: "o3-mini" },
+    { value: "gpt-5.4",      label: "GPT-5.4" },
+    { value: "gpt-5.4-mini", label: "GPT-5.4 mini" },
+    { value: "gpt-5.4-nano", label: "GPT-5.4 nano" },
+    { value: "gpt-4.1",      label: "GPT-4.1" },
+    { value: "gpt-4o",       label: "GPT-4o" },
+    { value: "o4-mini",      label: "o4-mini" },
   ],
   anthropic: [
     { value: "claude-opus-4-6",           label: "Claude Opus 4.6" },
     { value: "claude-sonnet-4-6",         label: "Claude Sonnet 4.6" },
     { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+    { value: "claude-opus-4-5",           label: "Claude Opus 4.5" },
+    { value: "claude-sonnet-4-5",         label: "Claude Sonnet 4.5" },
   ],
   gemini: [
-    { value: "gemini-2.5-pro",   label: "Gemini 2.5 Pro" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-3.1-pro",        label: "Gemini 3.1 Pro" },
+    { value: "gemini-3.1-flash",      label: "Gemini 3.1 Flash" },
+    { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+    { value: "gemini-2.5-pro",        label: "Gemini 2.5 Pro" },
+    { value: "gemini-2.5-flash",      label: "Gemini 2.5 Flash" },
   ],
 };
 const providerSelect = document.getElementById('provider-select');

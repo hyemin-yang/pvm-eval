@@ -233,7 +233,9 @@ def compute_failure_rates(categories: list, trace_labels: dict, total: int) -> l
                 counts[cat_id] += 1
 
     for cat in categories:
-        cat["failure_rate"] = round(counts.get(cat["id"], 0) / total, 4) if total > 0 else 0.0
+        count = counts.get(cat["id"], 0)
+        cat["fail_count"] = count
+        cat["failure_rate"] = round(count / total, 4) if total > 0 else 0.0
     return categories
 
 

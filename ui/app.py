@@ -1075,6 +1075,114 @@ def eval_step1_stop(prompt_id: str, version: str, pipeline_hash: str):
     )
 
 
+@app.post("/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step1/update-actions")
+async def eval_step1_update_actions(
+    request: Request,
+    prompt_id: str,
+    version: str,
+    pipeline_hash: str,
+):
+    """code_check 카테고리를 Judge에 포함할지 여부를 error_analysis.json에 반영."""
+    form = await request.form()
+    include_ids = set(form.getlist("include_ids"))
+    code_check_ids = set(form.getlist("code_check_ids"))
+
+    project = get_project()
+    run_dir = _run_dir(project, prompt_id, version, pipeline_hash)
+    ea_path = run_dir / "error_analysis.json"
+
+    if ea_path.exists():
+        import json as _json
+        data = _json.loads(ea_path.read_text(encoding="utf-8"))
+        for cat in data.get("categories", []):
+            if cat["id"] not in code_check_ids:
+                continue
+            # 최초 토글 시 original_action 보존
+            if "original_action" not in cat:
+                cat["original_action"] = cat["action"]
+            cat["action"] = "judge_prompt" if cat["id"] in include_ids else "code_check"
+        ea_path.write_text(
+            _json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    return RedirectResponse(
+        f"/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step1",
+        status_code=303,
+    )
+
+
+@app.get("/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step1/failures/{category_id}")
+def eval_step1_failures(prompt_id: str, version: str, pipeline_hash: str, category_id: str):
+    """특정 카테고리에서 Fail로 분류된 트레이스 목록을 JSON으로 반환."""
+    import csv as _csv
+    import json as _json
+    import yaml as _yaml
+
+    project = get_project()
+    run_dir = _run_dir(project, prompt_id, version, pipeline_hash)
+
+    ea_path = run_dir / "error_analysis.json"
+    if not ea_path.exists():
+        return JSONResponse({"error": "error_analysis.json 없음"}, status_code=404)
+    ea = _json.loads(ea_path.read_text(encoding="utf-8"))
+
+    # 해당 카테고리에서 Fail인 trace_id 수집
+    trace_labels = ea.get("trace_labels", {})
+    fail_ids = {tid for tid, labels in trace_labels.items() if labels.get(category_id) == "Fail"}
+    if not fail_ids:
+        return JSONResponse({"cases": [], "total": 0})
+
+    # config.yaml에서 column 매핑 로드
+    config_path = run_dir / "config.yaml"
+    if not config_path.exists():
+        return JSONResponse({"error": "config.yaml 없음"}, status_code=404)
+    cfg = _yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    cols = cfg.get("columns", {})
+    tid_col = cols.get("trace_id", "trace_id")
+    ui_col = cols.get("user_input", "")
+    lo_col = cols.get("llm_output", "")
+    conv_col = cols.get("conversation", "")
+    hl_col = cols.get("human_label", "")
+    hr_col = cols.get("human_reason", "")
+
+    # CSV에서 해당 rows 추출
+    csv_path = run_dir / "config.yaml"  # config에서 input_csv 경로 사용
+    input_csv = cfg.get("input_csv", "")
+    if not input_csv or not Path(input_csv).exists():
+        # pipeline_meta.json → csv_hash 경로로 fallback
+        meta_path = run_dir / "pipeline_meta.json"
+        if not meta_path.exists():
+            return JSONResponse({"error": "CSV 경로를 찾을 수 없음"}, status_code=404)
+        meta = _json.loads(meta_path.read_text(encoding="utf-8"))
+        csv_hash = meta.get("csv_hash", "")
+        input_csv = str(_pvm_dir(project) / "datasets" / csv_hash / "data.csv")
+
+    cases = []
+    try:
+        with open(input_csv, encoding="utf-8-sig") as f:
+            for row in _csv.DictReader(f):
+                tid = (row.get(tid_col) or "").strip()
+                if tid not in fail_ids:
+                    continue
+                user_input = row.get(ui_col, "") if ui_col else ""
+                llm_output = row.get(lo_col, "") if lo_col else ""
+                conversation = row.get(conv_col, "") if conv_col else ""
+                human_label = row.get(hl_col, "") if hl_col else ""
+                human_reason = row.get(hr_col, "") if hr_col else ""
+                cases.append({
+                    "trace_id": tid,
+                    "user_input": user_input,
+                    "llm_output": llm_output,
+                    "conversation": conversation,
+                    "human_label": human_label,
+                    "human_reason": human_reason,
+                })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    return JSONResponse({"cases": cases, "total": len(cases)})
+
+
 # ── Step 2 ────────────────────────────────────────────────────────────────────
 
 @app.get("/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2", response_class=HTMLResponse)
@@ -1110,6 +1218,60 @@ def eval_step2_status(prompt_id: str, version: str, pipeline_hash: str):
 @app.post("/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2/stop")
 def eval_step2_stop(prompt_id: str, version: str, pipeline_hash: str):
     stop_step(prompt_id, version, pipeline_hash, 2)
+    return RedirectResponse(
+        f"/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2",
+        status_code=303,
+    )
+
+
+@app.post("/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2/criteria/save")
+async def eval_step2_criteria_save(
+    request: Request,
+    prompt_id: str,
+    version: str,
+    pipeline_hash: str,
+):
+    """Criteria 텍스트를 직접 수정하여 저장. 타임스탬프 YAML을 생성해 재사용 목록에도 노출."""
+    import yaml as _yaml
+    from datetime import datetime as _dt
+
+    form = await request.form()
+    new_criteria = form.get("criteria", "").strip()
+    if not new_criteria:
+        return RedirectResponse(
+            f"/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2",
+            status_code=303,
+        )
+
+    project = get_project()
+    run_dir = _run_dir(project, prompt_id, version, pipeline_hash)
+    comp_dir = run_dir / "judge_components"
+    comp_dir.mkdir(parents=True, exist_ok=True)
+
+    # 현재 YAML 로드 (few_shot 등 나머지 필드 유지)
+    import json as _json
+    existing = load_step2_yaml(run_dir) or {}
+    existing["criteria"] = new_criteria
+
+    # 1) 타임스탬프 버전 저장 (재사용 목록용)
+    ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+    ts_path = comp_dir / f"{prompt_id}_judge_{ts}.yaml"
+    ts_path.write_text(
+        _yaml.dump(existing, allow_unicode=True, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    # 2) 현재 canonical YAML도 갱신 (judge.yaml 또는 기존 *_judge.yaml 중 최신)
+    canonical = comp_dir / "judge.yaml"
+    all_files = list(comp_dir.glob("*_judge.yaml"))
+    if not canonical.exists() and all_files:
+        candidates = [p for p in all_files if not p.name.count("_") >= 3]  # 타임스탬프 없는 것 우선
+        canonical = candidates[0] if candidates else all_files[0]
+    canonical.write_text(
+        _yaml.dump(existing, allow_unicode=True, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+
     return RedirectResponse(
         f"/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2",
         status_code=303,

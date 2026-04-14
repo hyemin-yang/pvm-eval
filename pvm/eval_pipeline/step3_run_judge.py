@@ -111,12 +111,9 @@ def compute_metrics(results: list[dict], judge_type: str) -> dict:
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="config.yaml 경로")
-    args = parser.parse_args()
-
-    cfg_path = Path(args.config)
+def run(config_path: str) -> None:
+    """step3 평가를 실행한다. pvm eval step3 --run-dir 에서 호출한다."""
+    cfg_path = Path(config_path)
     with open(cfg_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
@@ -319,6 +316,13 @@ def main() -> None:
         print(f"⏹ 중지됨. 부분 결과 저장 완료 ({len(results)}건): {results_path}", flush=True)
     else:
         print(f"✅ 완료! 결과: {results_path}", flush=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True, help="config.yaml 경로")
+    args = parser.parse_args()
+    run(args.config)
 
 
 if __name__ == "__main__":

@@ -106,19 +106,31 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">버전 단위</label>
-        <div class="flex gap-4">
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
-            <span class="text-sm">Patch</span>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">버전 단위</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="patch" checked class="sr-only bump-radio">
+            <div class="bump-box border-2 border-green-500 bg-green-50 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Patch</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">오탈자·표현<br>미세 수정</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="minor" class="text-green-600">
-            <span class="text-sm">Minor</span>
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="minor" class="sr-only bump-radio">
+            <div class="bump-box border-2 border-gray-200 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Minor</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">내용 추가<br>또는 변경</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="major" class="text-green-600">
-            <span class="text-sm">Major</span>
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="major" class="sr-only bump-radio">
+            <div class="bump-box border-2 border-gray-200 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Major</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">전면 개편</div>
+            </div>
           </label>
         </div>
       </div>
@@ -138,19 +150,31 @@
                   class="w-full text-sm font-mono border rounded px-3 py-2 bg-gray-50 focus:bg-white">{{ yaml_content }}</textarea>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">버전 단위</label>
-        <div class="flex gap-4">
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
-            <span class="text-sm">Patch</span>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">버전 단위</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="patch" checked class="sr-only bump-radio">
+            <div class="bump-box border-2 border-green-500 bg-green-50 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Patch</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">오탈자·표현<br>미세 수정</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="minor" class="text-green-600">
-            <span class="text-sm">Minor</span>
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="minor" class="sr-only bump-radio">
+            <div class="bump-box border-2 border-gray-200 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Minor</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">내용 추가<br>또는 변경</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="major" class="text-green-600">
-            <span class="text-sm">Major</span>
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="major" class="sr-only bump-radio">
+            <div class="bump-box border-2 border-gray-200 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Major</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">전면 개편</div>
+            </div>
           </label>
         </div>
       </div>
@@ -169,19 +193,31 @@
                class="w-full text-sm border rounded px-3 py-2 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">버전 단위</label>
-        <div class="flex gap-4">
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="patch" checked class="text-green-600">
-            <span class="text-sm">Patch</span>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">버전 단위</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="patch" checked class="sr-only bump-radio">
+            <div class="bump-box border-2 border-green-500 bg-green-50 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Patch</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">오탈자·표현<br>미세 수정</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="minor" class="text-green-600">
-            <span class="text-sm">Minor</span>
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="minor" class="sr-only bump-radio">
+            <div class="bump-box border-2 border-gray-200 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Minor</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">내용 추가<br>또는 변경</div>
+            </div>
           </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" name="bump_level" value="major" class="text-green-600">
-            <span class="text-sm">Major</span>
+          <label class="bump-option cursor-pointer">
+            <input type="radio" name="bump_level" value="major" class="sr-only bump-radio">
+            <div class="bump-box border-2 border-gray-200 rounded-lg p-3 text-center transition">
+              <div class="text-sm font-bold text-gray-800">Major</div>
+              <div class="bump-ver text-xs font-mono text-green-700 mt-0.5"></div>
+              <div class="text-xs text-gray-400 mt-1.5 leading-snug">전면 개편</div>
+            </div>
           </label>
         </div>
       </div>
@@ -204,6 +240,32 @@ function addExtraField() {
   `;
   container.appendChild(row);
 }
+
+// 버전 단위 카드 UI
+(function () {
+  const CUR = "{{ current_version }}";
+  function nextVer(ver, level) {
+    const [maj, min, pat] = ver.split('.').map(Number);
+    if (level === 'patch') return `${maj}.${min}.${pat + 1}`;
+    if (level === 'minor') return `${maj}.${min + 1}.0`;
+    if (level === 'major') return `${maj + 1}.0.0`;
+  }
+  document.querySelectorAll('.bump-option').forEach(label => {
+    const radio = label.querySelector('.bump-radio');
+    const box   = label.querySelector('.bump-box');
+    const verEl = label.querySelector('.bump-ver');
+    if (CUR && verEl) verEl.textContent = `→ v${nextVer(CUR, radio.value)}`;
+    label.addEventListener('click', () => {
+      const form = label.closest('form');
+      form.querySelectorAll('.bump-box').forEach(b => {
+        b.classList.remove('border-green-500', 'bg-green-50');
+        b.classList.add('border-gray-200');
+      });
+      box.classList.remove('border-gray-200');
+      box.classList.add('border-green-500', 'bg-green-50');
+    });
+  });
+})();
 
 function switchTab(tab) {
   const tabs = ['form', 'editor', 'upload'];

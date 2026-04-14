@@ -43,7 +43,11 @@ where = ["."]
 include = ["pvm*", "server*", "ui*"]
 
 [tool.setuptools.package-data]
-"pvm" = ["eval_pipeline/prompts/*.md"]
+"pvm" = [
+  "eval_pipeline/prompts/*.md",
+  "_skills/judge-prompt-generation/SKILL.md",
+  "_skills/prompt-versioning-manager/SKILL.md",
+]
 ui = [
   "static/**/*",
   "templates/**/*",

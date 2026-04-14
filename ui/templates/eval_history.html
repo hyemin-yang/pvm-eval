@@ -105,8 +105,11 @@
         <!-- 오른쪽: Pass Rate + 버튼 -->
         <div class="flex items-center gap-3 flex-shrink-0">
           {% if m %}
-          {% set pr = (m.get('pass_rate') or 0) * 100 %}
-          {% set acc = (m.accuracy or 0) * 100 %}
+          {% set conf = m.get('confusion', {}) %}
+          {% set valid = m.get('valid') or 0 %}
+          {% set judge_pass_cnt = (conf.get('tp', 0) + conf.get('fp', 0)) %}
+          {% set pr = (judge_pass_cnt / valid * 100) if valid else 0 %}
+          {% set acc = (m.get('accuracy') or 0) * 100 %}
           <div class="text-right">
             <div class="text-2xl font-bold font-mono text-indigo-600">
               {{ "%.1f"|format(pr) }}%

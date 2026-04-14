@@ -241,6 +241,37 @@ def run(
     print("\n다음 단계: python pipeline/step1_error_analysis.py --config", dest)
 
 
+def run_from_dir(run_dir: Path, pvm_root: Path) -> None:
+    """pipeline_meta.json을 읽어 run_dir 기준으로 step0를 실행한다.
+
+    pvm eval step0 --run-dir 명령에서 호출한다.
+    config.yaml을 run_dir에 생성하고 output_dir도 run_dir로 설정한다.
+    """
+    from pvm.eval_pipeline.pvm_storage import load_pipeline_meta, get_csv_path, get_prompt_path
+
+    meta = load_pipeline_meta(run_dir)
+    csv_hash = meta["csv_hash"]
+    prompt_id = meta["prompt_id"]
+    version = meta["prompt_version"]
+    judge_type = meta.get("judge_type", "pointwise")
+    provider = meta.get("provider", "openai")
+    model = meta.get("model", "gpt-5.4-2026-03-05")
+
+    csv_path = str(get_csv_path(pvm_root, csv_hash))
+    prompt_path_obj = get_prompt_path(pvm_root, prompt_id, version)
+    prompt_path = str(prompt_path_obj) if prompt_path_obj.exists() else None
+
+    run(
+        csv_path=csv_path,
+        prompt_path=prompt_path,
+        output_path=str(run_dir / "config.yaml"),
+        provider=provider,
+        model=model,
+        output_dir=str(run_dir),
+        judge_type=judge_type,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Step 0: CSV + 시스템 프롬프트 파일로 pipeline config YAML 자동 생성"

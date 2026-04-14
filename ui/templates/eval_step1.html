@@ -99,37 +99,95 @@
 
     <!-- 카테고리 결과 -->
     {% set categories = result.get('categories', []) %}
-    <div class="space-y-3">
-      <p class="text-sm text-gray-500">
-        총 <strong>{{ categories | length }}</strong>개 카테고리 도출
-        ({{ categories | selectattr('action', 'eq', 'judge_prompt') | list | length }}개 Judge 대상)
-      </p>
-      {% for cat in categories %}
+    {% set total_traces = result.get('trace_labels', {})|length %}
+    {% set judge_cats = categories | selectattr('action', 'eq', 'judge_prompt') | list %}
+    {% set code_check_cats = categories | selectattr('action', 'eq', 'code_check') | list %}
+    {% set promoted_cats = categories | selectattr('original_action', 'defined') | selectattr('original_action', 'eq', 'code_check') | selectattr('action', 'eq', 'judge_prompt') | list %}
+    {% set toggleable_cats = code_check_cats + promoted_cats %}
+
+    <p class="text-sm text-gray-500 mb-3">
+      총 <strong>{{ categories | length }}</strong>개 카테고리 도출
+      · Judge 대상 <strong>{{ judge_cats | length }}</strong>개
+      {% if toggleable_cats %}· 선택 대기 <strong>{{ toggleable_cats | length }}</strong>개{% endif %}
+    </p>
+
+    <!-- Judge 포함 카테고리 -->
+    <div class="space-y-2 mb-4">
+      {% for cat in judge_cats %}
+      {% if cat.get('original_action') != 'code_check' %}
       <div class="border border-gray-200 rounded-lg p-4">
+        {% include "partials/_cat_row.html" ignore missing %}
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-1">
-              <span class="font-semibold text-sm">{{ cat.name or cat.category_name or cat.id }}</span>
-              <span class="text-xs px-2 py-0.5 rounded-full font-medium
-                {% if cat.action == 'judge_prompt' %}bg-green-100 text-green-700
-                {% elif cat.action == 'code_check' %}bg-yellow-100 text-yellow-700
-                {% else %}bg-gray-100 text-gray-500{% endif %}">
-                {{ cat.action }}
-              </span>
+              <span class="font-semibold text-sm">{{ cat.name or cat.id }}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">judge_prompt</span>
             </div>
             <p class="text-sm text-gray-600">{{ cat.definition or cat.description or '' }}</p>
           </div>
-          <div class="text-right flex-shrink-0">
-            <span class="text-xs text-gray-400">실패 {{ cat.get('fail_count', '-') }}건</span>
+          <div class="text-right flex-shrink-0 min-w-[60px] flex flex-col items-end gap-1">
+            {% set fail_cnt = cat.fail_count if cat.get('fail_count') is not none else ((cat.failure_rate * total_traces)|round|int if cat.get('failure_rate') is not none and total_traces else none) %}
+            {% if fail_cnt is not none %}
+              <button type="button"
+                      onclick="openFailures('{{ cat.id }}', '{{ cat.name or cat.id }}')"
+                      class="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline underline-offset-2 cursor-pointer">
+                실패 {{ fail_cnt }}건 보기
+              </button>
+            {% endif %}
+            {% if cat.get('failure_rate') is not none %}
+            <div class="text-xs text-gray-400">{{ "%.1f"|format(cat.failure_rate * 100) }}%</div>
+            {% endif %}
           </div>
         </div>
       </div>
-      {% else %}
-      <p class="text-sm text-gray-400 py-4 text-center">카테고리가 없습니다.</p>
+      {% endif %}
       {% endfor %}
     </div>
 
-    <div class="mt-6 flex justify-end">
+    <!-- code_check 카테고리 토글 섹션 -->
+    {% if toggleable_cats %}
+    <div class="border border-yellow-200 bg-yellow-50 rounded-xl p-4 mb-4">
+      <p class="text-sm font-semibold text-yellow-800 mb-1">코드 체크 카테고리</p>
+      <p class="text-xs text-yellow-600 mb-3">
+        LLM이 코드로 검증 가능하다고 분류했습니다. Judge 프롬프트에 포함할 항목을 선택하세요.
+      </p>
+      <form method="post" action="{{ eval_url_base }}/step1/update-actions">
+        <div class="space-y-2 mb-3">
+          {% for cat in toggleable_cats %}
+          <input type="hidden" name="code_check_ids" value="{{ cat.id }}">
+          <label class="flex items-start gap-3 p-3 bg-white border border-yellow-200 rounded-lg cursor-pointer hover:border-yellow-400 transition">
+            <input type="checkbox" name="include_ids" value="{{ cat.id }}"
+                   class="mt-0.5 rounded text-indigo-600"
+                   {% if cat.action == 'judge_prompt' %}checked{% endif %}>
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-800">{{ cat.name or cat.id }}</span>
+                {% if cat.action == 'judge_prompt' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-600 font-medium">Judge 포함됨</span>
+                {% else %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium">code_check</span>
+                {% endif %}
+              </div>
+              <p class="text-xs text-gray-500 mt-0.5">{{ cat.definition or cat.description or '' }}</p>
+            </div>
+            <div class="text-right flex-shrink-0 text-xs text-gray-400">
+              {% if cat.get('fail_count') is not none %}실패 {{ cat.fail_count }}건
+              {% elif cat.get('failure_rate') is not none and total_traces %}실패 {{ (cat.failure_rate * total_traces)|round|int }}건
+              {% endif %}
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit"
+                class="px-4 py-1.5 bg-yellow-600 text-white text-xs font-semibold rounded-lg
+                       hover:bg-yellow-500 transition">
+          선택 저장
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="mt-4 flex justify-end">
       <a href="{{ eval_url_base }}/step2"
          class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-700 transition">
         다음: Judge 프롬프트 생성 →
@@ -157,6 +215,88 @@
   </div>
 
 </div>
+
+<!-- 실패 사례 모달 -->
+<div id="failures-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" onclick="closeFailures()"></div>
+  <div class="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl flex flex-col">
+    <!-- 모달 헤더 -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+      <div>
+        <h2 class="text-base font-semibold text-gray-900" id="modal-title">실패 사례</h2>
+        <p class="text-xs text-gray-400 mt-0.5" id="modal-subtitle"></p>
+      </div>
+      <button onclick="closeFailures()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+    </div>
+    <!-- 모달 본문 -->
+    <div id="modal-body" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div class="text-center text-gray-400 text-sm py-10">불러오는 중...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FAILURES_URL_BASE = '{{ eval_url_base }}/step1/failures';
+
+function openFailures(catId, catName) {
+  document.getElementById('failures-modal').classList.remove('hidden');
+  document.getElementById('modal-title').textContent = catName + ' — 실패 사례';
+  document.getElementById('modal-subtitle').textContent = '불러오는 중...';
+  document.getElementById('modal-body').innerHTML = '<div class="text-center text-gray-400 text-sm py-10">불러오는 중...</div>';
+
+  fetch(FAILURES_URL_BASE + '/' + encodeURIComponent(catId))
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('modal-body').innerHTML = `<p class="text-red-500 text-sm">${data.error}</p>`;
+        return;
+      }
+      document.getElementById('modal-subtitle').textContent = `총 ${data.total}건`;
+      if (!data.cases || data.cases.length === 0) {
+        document.getElementById('modal-body').innerHTML = '<p class="text-gray-400 text-sm text-center py-10">실패 사례가 없습니다.</p>';
+        return;
+      }
+      const html = data.cases.map((c, i) => {
+        const labelColor = c.human_label === 'Pass' ? 'text-green-600 bg-green-50' :
+                           c.human_label === 'Fail' ? 'text-red-600 bg-red-50' : 'text-gray-500 bg-gray-100';
+        const content = c.user_input
+          ? `<div class="mb-2"><span class="text-xs font-semibold text-gray-500 block mb-0.5">User Input</span>
+             <p class="text-xs text-gray-700 bg-gray-50 rounded p-2 whitespace-pre-wrap max-h-32 overflow-auto">${escHtml(c.user_input)}</p></div>
+             <div class="mb-2"><span class="text-xs font-semibold text-gray-500 block mb-0.5">AI Response</span>
+             <p class="text-xs text-gray-700 bg-gray-50 rounded p-2 whitespace-pre-wrap max-h-32 overflow-auto">${escHtml(c.llm_output)}</p></div>`
+          : c.conversation
+          ? `<div class="mb-2"><span class="text-xs font-semibold text-gray-500 block mb-0.5">대화</span>
+             <p class="text-xs text-gray-700 bg-gray-50 rounded p-2 whitespace-pre-wrap max-h-40 overflow-auto">${escHtml(c.conversation)}</p></div>`
+          : '';
+        const critique = c.human_reason
+          ? `<div><span class="text-xs font-semibold text-gray-500 block mb-0.5">판정 이유</span>
+             <p class="text-xs text-gray-700 bg-indigo-50 border border-indigo-100 rounded p-2">${escHtml(c.human_reason)}</p></div>`
+          : '';
+        return `<div class="border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xs font-mono text-gray-400 truncate">${escHtml(c.trace_id)}</span>
+            ${c.human_label ? `<span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded ${labelColor}">${escHtml(c.human_label)}</span>` : ''}
+          </div>
+          ${content}${critique}
+        </div>`;
+      }).join('');
+      document.getElementById('modal-body').innerHTML = html;
+    })
+    .catch(e => {
+      document.getElementById('modal-body').innerHTML = `<p class="text-red-500 text-sm">오류: ${e}</p>`;
+    });
+}
+
+function closeFailures() {
+  document.getElementById('failures-modal').classList.add('hidden');
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFailures(); });
+</script>
 
 {% if is_running %}
 <script>

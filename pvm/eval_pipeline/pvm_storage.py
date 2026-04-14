@@ -60,16 +60,37 @@ def judge_run_dir(pvm_root: Path, prompt_id: str, version: str, pipeline_hash: s
     return pvm_root / "prompts" / prompt_id / "versions" / version / "judge" / pipeline_hash
 
 
+def get_csv_path(pvm_root: Path, csv_hash: str) -> Path:
+    """등록된 CSV 파일 경로를 반환한다."""
+    return pvm_root / "datasets" / csv_hash / "data.csv"
+
+
+def get_prompt_path(pvm_root: Path, prompt_id: str, version: str) -> Path:
+    """등록된 prompt.md 파일 경로를 반환한다."""
+    return pvm_root / "prompts" / prompt_id / "versions" / version / "prompt.md"
+
+
 # ── CSV 등록 ──────────────────────────────────────────────────────────────────
 
-def register_csv(pvm_root: Path, csv_path: Path) -> tuple[str, Path]:
+def register_csv(
+    pvm_root: Path,
+    csv_path: Path,
+    original_path: Path | None = None,
+) -> tuple[str, Path]:
     """CSV를 .pvm/datasets/{hash}/ 에 등록한다.
 
     이미 등록된 CSV는 복사하지 않고 기존 경로를 반환.
 
+    Args:
+        pvm_root: .pvm/ 디렉토리 경로
+        csv_path: 등록할 CSV 파일 경로 (이미 csv 형태여야 함)
+        original_path: 원본 파일 경로 (xlsx 등 변환 전 경로; 없으면 csv_path 사용)
+
     Returns:
         (csv_hash, registered_data_path)
     """
+    import pandas as pd
+
     csv_hash = compute_csv_hash(csv_path)
     dataset_dir = datasets_dir(pvm_root) / csv_hash
     data_path = dataset_dir / "data.csv"
@@ -77,16 +98,20 @@ def register_csv(pvm_root: Path, csv_path: Path) -> tuple[str, Path]:
     if not data_path.exists():
         dataset_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(csv_path, data_path)
-        meta = {
-            "csv_hash": csv_hash,
-            "original_name": csv_path.name,
-            "registered_at": datetime.now(timezone.utc).isoformat(),
-            "size_bytes": csv_path.stat().st_size,
-        }
-        (dataset_dir / "meta.json").write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+
+    # meta.json: SKILL.md 스키마 (original_path, row_count, columns 포함)
+    df = pd.read_csv(data_path)
+    meta = {
+        "csv_hash": csv_hash,
+        "original_path": str((original_path or csv_path).resolve()),
+        "registered_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "row_count": len(df),
+        "columns": list(df.columns),
+    }
+    (dataset_dir / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     return csv_hash, data_path
 
@@ -107,7 +132,7 @@ def create_pipeline_run(
     Returns:
         (pipeline_hash, run_dir)
     """
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     pipeline_hash = compute_pipeline_hash(
         csv_hash=csv_hash,
         prompt_id=prompt_id,
@@ -128,15 +153,37 @@ def create_pipeline_run(
         "judge_model": judge_model,
         "judge_provider": judge_provider,
         "created_at": created_at,
-        "status": "initialized",  # initialized → running → done | failed
+        "steps_completed": [],
     }
     _write_json(run_dir / "pipeline_meta.json", meta)
 
     return pipeline_hash, run_dir
 
 
+def load_pipeline_meta(run_dir: Path) -> dict:
+    """pipeline_meta.json을 로드한다."""
+    meta_path = run_dir / "pipeline_meta.json"
+    return json.loads(meta_path.read_text(encoding="utf-8"))
+
+
+def mark_step_completed(run_dir: Path, step: str) -> list[str]:
+    """pipeline_meta.json의 steps_completed에 step을 추가한다.
+
+    Returns:
+        Updated steps_completed list
+    """
+    meta_path = run_dir / "pipeline_meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    steps = list(dict.fromkeys(meta.get("steps_completed", [])))  # dedupe, preserve order
+    if step not in steps:
+        steps.append(step)
+    meta["steps_completed"] = steps
+    _write_json(meta_path, meta)
+    return steps
+
+
 def update_pipeline_status(run_dir: Path, status: str, **extra) -> None:
-    """pipeline_meta.json의 status 필드를 갱신한다."""
+    """pipeline_meta.json의 status 필드를 갱신한다 (legacy 호환용)."""
     meta_path = run_dir / "pipeline_meta.json"
     if not meta_path.exists():
         return
@@ -155,10 +202,12 @@ def list_pipeline_runs(pvm_root: Path, prompt_id: str, version: str) -> list[dic
         return []
 
     runs = []
-    for run_dir in sorted(judge_dir.iterdir(), reverse=True):
+    for run_dir in judge_dir.iterdir():
         meta_path = run_dir / "pipeline_meta.json"
         if meta_path.exists():
             runs.append(json.loads(meta_path.read_text(encoding="utf-8")))
+
+    runs.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     return runs
 
 
@@ -173,10 +222,12 @@ def load_judge_results_from_pvm(
 
 
 def latest_judge_result(pvm_root: Path, prompt_id: str, version: str) -> dict | None:
-    """가장 최근 완료된 judge 결과를 반환한다 (status=done인 것 중 최신)."""
+    """가장 최근 완료된 judge 결과를 반환한다 (step3 완료된 것 중 최신)."""
     runs = list_pipeline_runs(pvm_root, prompt_id, version)
     for run in runs:
-        if run.get("status") == "done":
+        steps = run.get("steps_completed", [])
+        # steps_completed 기반 (신) 또는 status=done (구) 모두 지원
+        if "step3" in steps or run.get("status") == "done":
             return load_judge_results_from_pvm(
                 pvm_root, prompt_id, version, run["pipeline_hash"]
             )

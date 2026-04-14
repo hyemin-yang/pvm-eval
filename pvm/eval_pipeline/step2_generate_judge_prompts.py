@@ -261,11 +261,14 @@ def select_fewshot_examples(
     def pick(candidates: list[dict]) -> dict | None:
         if not candidates:
             return None
+        # 1순위: critique 있는 케이스, 2순위: critique 없지만 human 라벨 있는 케이스
+        with_critique = [c for c in candidates if c.get("human_reason")]
+        base = with_critique if with_critique else candidates
         preferred = [
-            c for c in candidates
+            c for c in base
             if c["trace_id"] not in global_used and c["trace_id"] not in local_used
         ]
-        pool = preferred or [c for c in candidates if c["trace_id"] not in local_used] or candidates
+        pool = preferred or [c for c in base if c["trace_id"] not in local_used] or base
         choice = rng.choice(pool)
         local_used.add(choice["trace_id"])
         if used_trace_ids is not None:
@@ -345,11 +348,14 @@ def select_fewshot_examples_pairwise(
     def pick(candidates: list[dict]) -> dict | None:
         if not candidates:
             return None
+        # 1순위: critique 있는 케이스, 2순위: critique 없지만 human 라벨 있는 케이스
+        with_critique = [c for c in candidates if c.get("human_reason")]
+        base = with_critique if with_critique else candidates
         preferred = [
-            c for c in candidates
+            c for c in base
             if c["trace_id"] not in global_used and c["trace_id"] not in local_used
         ]
-        pool = preferred or [c for c in candidates if c["trace_id"] not in local_used] or candidates
+        pool = preferred or [c for c in base if c["trace_id"] not in local_used] or base
         choice = rng.choice(pool)
         local_used.add(choice["trace_id"])
         if used_trace_ids is not None:
@@ -592,10 +598,14 @@ def run(
 
     output_path = components_dir / f"{config['task_name']}_judge.yaml"
     save_components(components, output_path)
+    # Canonical alias for SKILL.md compatibility (기존 criteria 재사용 flow 등)
+    save_components(components, components_dir / "judge.yaml")
     component_snapshot_path = components_dir / f"{config['task_name']}_judge_{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"
     save_components(components, component_snapshot_path)
     preview_path = output_dir / f"{config['task_name']}_judge_prompt.md"
     preview_path.write_text(preview_text, encoding="utf-8")
+    # Canonical alias (SKILL.md는 judge_prompt.md 기준으로 참조)
+    (output_dir / "judge_prompt.md").write_text(preview_text, encoding="utf-8")
     preview_snapshot_path = output_dir / f"{config['task_name']}_judge_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
     preview_snapshot_path.write_text(preview_text, encoding="utf-8")
 

@@ -136,6 +136,7 @@
                   onchange="updateModels(this.value)">
             <option value="openai">openai</option>
             <option value="anthropic">anthropic</option>
+            <option value="gemini">google gemini</option>
           </select>
         </div>
         <div>
@@ -161,8 +162,9 @@
 </div>
 <script>
 const MODEL_OPTIONS = {
-  openai:    ['gpt-4.1', 'gpt-4o', 'gpt-4o-mini'],
-  anthropic: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+  openai:    ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-4.1', 'gpt-4o', 'o4-mini'],
+  anthropic: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'claude-opus-4-5', 'claude-sonnet-4-5'],
+  gemini:    ['gemini-3.1-pro', 'gemini-3.1-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash'],
 };
 
 function updateModels(provider) {

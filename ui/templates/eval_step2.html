@@ -110,66 +110,170 @@
     <div class="grid grid-cols-3 gap-3 mb-6">
       <div class="bg-gray-50 rounded-lg p-3 text-center">
         <div class="text-2xl font-bold text-indigo-600">{{ criteria_count }}</div>
-        <div class="text-xs text-gray-500 mt-1">평가 Criteria</div>
+        <div class="text-xs text-gray-500 mt-1">평가 Criteria 수</div>
+        <div class="text-xs text-gray-400 mt-0.5">카테고리별 판단 기준</div>
       </div>
       <div class="bg-gray-50 rounded-lg p-3 text-center">
         <div class="text-2xl font-bold text-indigo-600">{{ few_shots | length }}</div>
-        <div class="text-xs text-gray-500 mt-1">Few-shot 예시</div>
+        <div class="text-xs text-gray-500 mt-1">Few-shot 예시 수</div>
+        <div class="text-xs text-gray-400 mt-0.5">Judge 학습용 참고 케이스</div>
       </div>
       <div class="bg-gray-50 rounded-lg p-3 text-center">
-        <div class="text-lg font-bold text-indigo-600">{{ result.get('judge_type', '') or 'pointwise' }}</div>
+        <div class="text-lg font-bold text-indigo-600">{{ result.get('judge_type', 'pointwise') }}</div>
         <div class="text-xs text-gray-500 mt-1">Judge 유형</div>
+        <div class="text-xs text-gray-400 mt-0.5">
+          {% if result.get('judge_type') == 'pairwise' %}두 응답 비교{% else %}단일 응답 평가{% endif %}
+        </div>
       </div>
     </div>
 
     <!-- Criteria -->
     {% if criteria_text %}
     <div class="mb-6">
-      <h3 class="text-sm font-semibold text-gray-700 mb-2">평가 Criteria</h3>
-      <pre class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-4
-                  whitespace-pre-wrap overflow-auto max-h-72 text-gray-700 leading-relaxed">{{ criteria_text }}</pre>
+      <div class="flex items-center gap-2 mb-2">
+        <h3 class="text-sm font-semibold text-gray-700">평가 Criteria</h3>
+        <span class="text-xs text-gray-400">— Judge가 각 트레이스를 이 기준으로 Pass/Fail 판정합니다</span>
+        <button id="criteria-edit-btn" type="button" onclick="toggleCriteriaEdit()"
+                class="ml-auto text-xs px-2.5 py-1 rounded border border-gray-300 text-gray-500
+                       hover:border-indigo-400 hover:text-indigo-600 transition">
+          ✏️ 편집
+        </button>
+      </div>
+
+      <!-- 읽기 모드 -->
+      <div id="criteria-view">
+        <pre class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-4
+                    whitespace-pre-wrap overflow-auto max-h-72 text-gray-700 leading-relaxed">{{ criteria_text }}</pre>
+      </div>
+
+      <!-- 편집 모드 (숨김) -->
+      <div id="criteria-edit" class="hidden">
+        <form method="post" action="{{ eval_url_base }}/step2/criteria/save">
+          <textarea name="criteria" id="criteria-textarea"
+                    class="w-full text-xs font-mono bg-white border border-indigo-300 rounded-lg p-4
+                           h-72 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400
+                           text-gray-700 leading-relaxed">{{ criteria_text }}</textarea>
+          <div class="flex items-center gap-2 mt-2">
+            <button type="submit"
+                    class="px-4 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg
+                           hover:bg-indigo-500 transition">
+              저장
+            </button>
+            <button type="button" onclick="toggleCriteriaEdit()"
+                    class="px-4 py-1.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg
+                           hover:bg-gray-200 transition">
+              취소
+            </button>
+            <span class="text-xs text-gray-400 ml-1">저장 시 재사용 가능한 버전으로 자동 기록됩니다.</span>
+          </div>
+        </form>
+      </div>
     </div>
     {% endif %}
 
-    <!-- Few-shot 아코디언 -->
+    <!-- Few-shot 예시 -->
     {% if few_shots %}
     <div class="mb-6">
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">Few-shot 예시 ({{ few_shots | length }}개)</h3>
+      <div class="flex items-center gap-2 mb-1">
+        <h3 class="text-sm font-semibold text-gray-700">Few-shot 예시</h3>
+        <span class="text-xs text-gray-400">{{ few_shots | length }}개</span>
+      </div>
+
+      <!-- 범례 -->
+      <div class="flex flex-wrap items-center gap-3 mb-3 px-1 text-xs text-gray-500">
+        <span class="font-medium text-gray-600">예시 유형 설명:</span>
+        <span class="flex items-center gap-1">
+          <span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">명확 Pass</span>
+          <span class="text-gray-400">LLM·human 판정 모두 Pass</span>
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">명확 Fail</span>
+          <span class="text-gray-400">LLM·human 판정 모두 Fail</span>
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium">경계 Pass/Fail</span>
+          <span class="text-gray-400">LLM과 human 판정이 어긋난 케이스</span>
+        </span>
+      </div>
+      <div class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-3 text-xs text-blue-700">
+        ℹ️ <strong>명확 Pass</strong>는 LLM이 해당 카테고리에 대해 Pass로 판정하고, human 담당자 판정도 Pass인 케이스입니다.
+        <strong>명확 Fail</strong>은 그 반대입니다.
+        <strong>경계(borderline)</strong>는 LLM 판정과 human 판정이 서로 어긋난 케이스로,
+        이런 케이스를 few-shot에 포함시켜 Judge LLM이 경계 케이스에서도 정확하게 판정하도록 학습시킵니다.
+      </div>
+
       <div class="space-y-2">
         {% for ex in few_shots %}
-        <details class="border border-gray-200 rounded-lg">
-          <summary class="px-4 py-2.5 cursor-pointer select-none flex items-center gap-3 hover:bg-gray-50">
+        {% set ex_type = ex.get('type', '') %}
+        {% set human_label = ex.get('label', ex.get('winner', '')) %}
+        {% set is_pass_type = ex_type.endswith('pass') %}
+        {% set is_borderline = ex_type.startswith('borderline') %}
+        {% set label_mismatch = (is_pass_type and human_label == 'Fail') or (not is_pass_type and ex_type.endswith('fail') and human_label == 'Pass') %}
+
+        {# 한국어 타입명 #}
+        {% if ex_type == 'clear_pass' %}{% set type_label = '명확 Pass' %}
+        {% elif ex_type == 'clear_fail' %}{% set type_label = '명확 Fail' %}
+        {% elif ex_type == 'borderline_pass' %}{% set type_label = '경계 Pass' %}
+        {% elif ex_type == 'borderline_fail' %}{% set type_label = '경계 Fail' %}
+        {% else %}{% set type_label = ex_type %}{% endif %}
+
+        <details class="border rounded-lg {% if label_mismatch %}border-orange-200{% else %}border-gray-200{% endif %}">
+          <summary class="px-4 py-2.5 cursor-pointer select-none flex items-center gap-2 hover:bg-gray-50 rounded-lg">
+            <!-- 예시 유형 (카테고리 기준) -->
             <span class="text-xs px-2 py-0.5 rounded font-medium
-              {% if ex.get('type','').endswith('pass') %}bg-green-100 text-green-700
+              {% if is_borderline %}bg-yellow-100 text-yellow-700
+              {% elif is_pass_type %}bg-green-100 text-green-700
               {% else %}bg-red-100 text-red-700{% endif %}">
-              {{ ex.get('type', '?') }}
+              {{ type_label }}
             </span>
-            <span class="text-xs text-gray-500 font-mono">{{ ex.get('trace_id', '') }}</span>
-            <span class="ml-auto text-xs font-semibold
-              {% if ex.get('label','') == 'Pass' %}text-green-600
-              {% elif ex.get('label','') == 'Fail' %}text-red-600
-              {% else %}text-gray-500{% endif %}">
-              {{ ex.get('label', ex.get('winner', '')) }}
+            <span class="text-xs text-gray-400">이 카테고리 기준</span>
+
+            <!-- trace id -->
+            <span class="text-xs text-gray-400 font-mono ml-1 truncate max-w-[180px]">{{ ex.get('trace_id', '') }}</span>
+
+            <!-- 전체 human 판정 -->
+            <span class="ml-auto flex items-center gap-1 flex-shrink-0">
+              <span class="text-xs text-gray-400">전체 판정</span>
+              <span class="text-xs font-semibold px-1.5 py-0.5 rounded
+                {% if human_label == 'Pass' %}bg-green-50 text-green-600
+                {% elif human_label == 'Fail' %}bg-red-50 text-red-600
+                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                {{ human_label or '-' }}
+              </span>
+              {% if label_mismatch %}
+              <span class="text-orange-400 text-xs" title="카테고리 판정과 전체 판정이 다릅니다">⚠</span>
+              {% endif %}
             </span>
           </summary>
-          <div class="px-4 pb-4 pt-2 text-xs space-y-2 border-t border-gray-100">
+
+          <div class="px-4 pb-4 pt-3 text-xs space-y-3 border-t
+                      {% if label_mismatch %}border-orange-100 bg-orange-50/30{% else %}border-gray-100{% endif %}">
+            {% if label_mismatch %}
+            <p class="text-orange-600 bg-orange-50 border border-orange-100 rounded px-2 py-1.5">
+              ⚠ 이 트레이스는 <strong>이 카테고리 기준으로는 {{ type_label }}</strong>이지만,
+              라벨링 담당자의 <strong>전체 판정은 {{ human_label }}</strong>입니다.
+              다른 카테고리의 문제로 전체 판정이 달라진 케이스입니다.
+            </p>
+            {% endif %}
             {% if ex.get('prompt') %}
             <div>
-              <span class="font-semibold text-gray-500">User Input:</span>
-              <p class="mt-0.5 text-gray-700 whitespace-pre-wrap max-h-24 overflow-auto">{{ ex.get('prompt') }}</p>
+              <span class="font-semibold text-gray-500 block mb-0.5">User Input</span>
+              <p class="text-gray-700 whitespace-pre-wrap max-h-28 overflow-auto bg-gray-50 rounded p-2">{{ ex.get('prompt') }}</p>
             </div>
             {% endif %}
             {% if ex.get('response') %}
             <div>
-              <span class="font-semibold text-gray-500">AI Response:</span>
-              <p class="mt-0.5 text-gray-700 whitespace-pre-wrap max-h-24 overflow-auto">{{ ex.get('response') }}</p>
+              <span class="font-semibold text-gray-500 block mb-0.5">AI Response</span>
+              <p class="text-gray-700 whitespace-pre-wrap max-h-28 overflow-auto bg-gray-50 rounded p-2">{{ ex.get('response') }}</p>
             </div>
             {% endif %}
-            {% if ex.get('critique') %}
+            {% if ex.get('critique') and ex.get('critique') != '수동 비평 없음' %}
             <div>
-              <span class="font-semibold text-gray-500">Critique:</span>
-              <p class="mt-0.5 text-gray-700">{{ ex.get('critique') }}</p>
+              <span class="font-semibold text-gray-500 block mb-0.5">판정 이유 (Critique)</span>
+              <p class="text-gray-700 bg-indigo-50 border border-indigo-100 rounded p-2">{{ ex.get('critique') }}</p>
             </div>
+            {% elif ex.get('critique') == '수동 비평 없음' %}
+            <p class="text-gray-400 italic">판정 이유 없음</p>
             {% endif %}
           </div>
         </details>
@@ -206,6 +310,24 @@
 
   {% endif %}
 </div>
+
+<script>
+function toggleCriteriaEdit() {
+  const view = document.getElementById('criteria-view');
+  const edit = document.getElementById('criteria-edit');
+  const btn  = document.getElementById('criteria-edit-btn');
+  if (edit.classList.contains('hidden')) {
+    view.classList.add('hidden');
+    edit.classList.remove('hidden');
+    btn.textContent = '✕ 닫기';
+    document.getElementById('criteria-textarea').focus();
+  } else {
+    view.classList.remove('hidden');
+    edit.classList.add('hidden');
+    btn.textContent = '✏️ 편집';
+  }
+}
+</script>
 
 {% if is_running %}
 <script>

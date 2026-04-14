@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from pvm.core.errors import AlreadyInitializedError, NotValidProjectError
@@ -8,6 +9,9 @@ from pvm.storage.json_io import write_text
 from pvm.storage.time import utc_now_iso
 from pvm.storage.ulid import generate_ulid
 from pvm.storage.yaml_io import dump_yaml
+
+# 패키지에 번들된 _skills/ 디렉토리 경로
+_BUNDLED_SKILLS_DIR = Path(__file__).parent.parent / "_skills"
 
 
 DEFAULT_TEMPLATE = {
@@ -58,6 +62,8 @@ def init_project(root: Path, name: str = DEFAULT_PROJECT_NAME) -> dict[str, str]
     dump_yaml(paths.template_file, DEFAULT_TEMPLATE)
     write_text(paths.snapshot_history_file, "")
 
+    _install_claude_skills(root)
+
     required_dirs = (
         paths.project_dir,
         paths.settings_dir,
@@ -85,3 +91,20 @@ def init_project(root: Path, name: str = DEFAULT_PROJECT_NAME) -> dict[str, str]
         "created_at": created_at,
         "root": str(paths.root),
     }
+
+
+def _install_claude_skills(root: Path) -> None:
+    """패키지에 번들된 Claude Code skills를 프로젝트 루트의 .claude/skills/에 복사한다."""
+    if not _BUNDLED_SKILLS_DIR.exists():
+        return
+
+    skills_dest = root / ".claude" / "skills"
+    skills_dest.mkdir(parents=True, exist_ok=True)
+
+    for skill_src in _BUNDLED_SKILLS_DIR.iterdir():
+        if not skill_src.is_dir():
+            continue
+        skill_dest = skills_dest / skill_src.name
+        if skill_dest.exists():
+            shutil.rmtree(skill_dest)
+        shutil.copytree(skill_src, skill_dest, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
