@@ -75,18 +75,33 @@ def parse_judge_output(raw: str, judge_type: str) -> dict:
 
 def compute_metrics(results: list[dict], judge_type: str) -> dict:
     """평가 결과로부터 메트릭을 계산한다."""
-    # excluded_from_metrics=True인 행(human_label 없음)은 제외
+    all_total = len(results)
+    judged_results = [r for r in results if r["judge_verdict"] != "PARSE_ERROR"]
+    judged_total = len(judged_results)
+    pass_count = sum(1 for r in judged_results if r["judge_verdict"] in {"Pass", "A"})
+    error_count_all = sum(1 for r in results if r["judge_verdict"] == "PARSE_ERROR")
+
+    # excluded_from_metrics=True인 행(human_label 없음)은 정확도 계열 메트릭에서 제외
     metric_results = [r for r in results if not r.get("excluded_from_metrics")]
     total = len(metric_results)
     error_count = sum(1 for r in metric_results if r["judge_verdict"] == "PARSE_ERROR")
     valid = [r for r in metric_results if r["judge_verdict"] != "PARSE_ERROR"]
 
+    base_metrics = {
+        "all_total": all_total,
+        "judged_total": judged_total,
+        "pass_count": pass_count,
+        "pass_rate": round(pass_count / judged_total, 4) if judged_total else 0.0,
+        "error_count_all": error_count_all,
+        "total": total,
+        "valid": len(valid),
+        "error_count": error_count,
+    }
+
     if judge_type == "pairwise":
         correct = sum(1 for r in valid if r["judge_verdict"] == r["human_label"])
         return {
-            "total": total,
-            "valid": len(valid),
-            "error_count": error_count,
+            **base_metrics,
             "accuracy": round(correct / len(valid), 4) if valid else 0.0,
             "correct": correct,
         }
@@ -101,9 +116,7 @@ def compute_metrics(results: list[dict], judge_type: str) -> dict:
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     return {
-        "total": total,
-        "valid": len(valid),
-        "error_count": error_count,
+        **base_metrics,
         "accuracy": round(accuracy, 4),
         "precision": round(precision, 4),
         "recall": round(recall, 4),
@@ -299,6 +312,11 @@ def run(config_path: str) -> None:
     _save_results(results, is_partial=_stop_requested)
     metrics = compute_metrics(results, judge_type)
 
+    print(
+        f"[Step3] Pass rate: {metrics.get('pass_rate', 0.0):.1%}  "
+        f"({metrics.get('pass_count', 0)}/{metrics.get('judged_total', 0)}건)",
+        flush=True,
+    )
     print(f"[Step3] 정확도: {metrics['accuracy']:.1%}  ({metrics.get('valid',0)}/{metrics.get('total',0)}건)", flush=True)
     if judge_type == "pointwise" and "confusion" in metrics:
         c = metrics["confusion"]

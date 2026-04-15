@@ -378,6 +378,30 @@ def _eval_ui_url(project) -> str:
         return "http://localhost:8010"
 
 
+def _augment_eval_metrics(metrics: dict | None, results: list[dict] | None = None) -> dict | None:
+    """Normalize eval metrics across old and new judge_results formats."""
+    if metrics is None:
+        return None
+
+    normalized = dict(metrics)
+    results = results or []
+
+    judged_results = [r for r in results if r.get("judge_verdict") != "PARSE_ERROR"]
+    pass_count_from_results = sum(1 for r in judged_results if r.get("judge_verdict") in {"Pass", "A"})
+    judged_total_from_results = len(judged_results)
+
+    if normalized.get("pass_count") is None:
+        normalized["pass_count"] = pass_count_from_results
+    if normalized.get("judged_total") is None:
+        normalized["judged_total"] = judged_total_from_results or normalized.get("valid", 0)
+    if normalized.get("pass_rate") is None:
+        judged_total = normalized.get("judged_total") or 0
+        pass_count = normalized.get("pass_count") or 0
+        normalized["pass_rate"] = (pass_count / judged_total) if judged_total else 0.0
+
+    return normalized
+
+
 def _get_eval_summary(project, prompt_id: str) -> dict[str, dict | None]:
     """각 버전의 최신 judge 결과 요약(metrics)을 반환한다.
 
@@ -414,24 +438,15 @@ def _get_eval_summary(project, prompt_id: str) -> dict[str, dict | None]:
             if results_path.exists():
                 try:
                     data = json.loads(results_path.read_text(encoding="utf-8"))
-                    found = data.get("metrics")
+                    found = _augment_eval_metrics(
+                        data.get("metrics"),
+                        data.get("results", []),
+                    )
                     if found is not None:
                         found = dict(found)
                         found["run_at"] = data.get("run_at", "")
                         found["partial"] = data.get("partial", False)
                         found["pipeline_hash"] = run_dir.name
-                        # pass_rate 계산: judge가 Pass 판정한 비율
-                        conf = found.get("confusion") or {}
-                        valid = found.get("valid") or 0
-                        if conf and valid:
-                            found["pass_rate"] = (conf.get("tp", 0) + conf.get("fp", 0)) / valid
-                        elif valid:
-                            # fallback: results 직접 집계
-                            results = data.get("results", [])
-                            pass_cnt = sum(1 for r in results if r.get("judge_verdict") == "Pass")
-                            found["pass_rate"] = pass_cnt / valid
-                        else:
-                            found["pass_rate"] = None
                 except Exception:
                     pass
                 break
@@ -762,6 +777,114 @@ def _run_dir(project, prompt_id: str, version: str, pipeline_hash: str) -> Path:
     return _pvm_dir(project) / "prompts" / prompt_id / "versions" / version / "judge" / pipeline_hash
 
 
+def _meta_created_at(run_dir: Path) -> str:
+    meta_path = run_dir / "pipeline_meta.json"
+    if meta_path.exists():
+        try:
+            import json as _j
+            return _j.loads(meta_path.read_text(encoding="utf-8")).get("created_at", "")
+        except Exception:
+            pass
+    return ""
+
+
+def _resolve_run_csv_info(project, run_dir: Path, meta: dict | None = None) -> dict | None:
+    """Resolve the CSV backing an eval run from metadata or config fallback."""
+    import json as _j
+    import yaml as _yaml
+
+    meta = meta or {}
+    pvm_dir = _pvm_dir(project)
+
+    csv_hash = meta.get("csv_hash", "") or ""
+    if csv_hash:
+        csv_path = pvm_dir / "datasets" / csv_hash / "data.csv"
+        if csv_path.exists():
+            csv_filename = ""
+            meta_path = pvm_dir / "datasets" / csv_hash / "meta.json"
+            if meta_path.exists():
+                try:
+                    csv_filename = _j.loads(meta_path.read_text(encoding="utf-8")).get("original_name", "")
+                except Exception:
+                    pass
+            return {
+                "csv_hash": csv_hash,
+                "csv_path": csv_path,
+                "csv_filename": csv_filename or csv_path.name,
+            }
+
+    config_path = run_dir / "config.yaml"
+    if config_path.exists():
+        try:
+            cfg = _yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            cfg = {}
+        input_csv = str(cfg.get("input_csv", "")).strip()
+        if input_csv:
+            csv_path = Path(input_csv)
+            if not csv_path.is_absolute():
+                csv_path = run_dir / input_csv
+            if csv_path.exists():
+                recovered_hash = ""
+                parts = csv_path.parts
+                if "datasets" in parts:
+                    idx = parts.index("datasets")
+                    if idx + 1 < len(parts):
+                        recovered_hash = parts[idx + 1]
+                return {
+                    "csv_hash": recovered_hash,
+                    "csv_path": csv_path,
+                    "csv_filename": csv_path.name,
+                }
+
+    return None
+
+
+def _eval_reusable_csvs(project, prompt_id: str) -> list[dict]:
+    """Return unique reusable CSVs seen in prior eval runs for a prompt."""
+    import json as _j
+
+    items: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    try:
+        versions = project.list_prompt_versions(prompt_id)
+    except Exception:
+        return items
+
+    for ver in reversed(versions):
+        judge_dir = _pvm_dir(project) / "prompts" / prompt_id / "versions" / ver / "judge"
+        if not judge_dir.exists():
+            continue
+        for run_dir in sorted(judge_dir.iterdir(), reverse=True):
+            if not run_dir.is_dir():
+                continue
+            meta_path = run_dir / "pipeline_meta.json"
+            meta: dict = {}
+            if meta_path.exists():
+                try:
+                    meta = _j.loads(meta_path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            csv_info = _resolve_run_csv_info(project, run_dir, meta)
+            if csv_info is None:
+                continue
+            dedupe_key = (csv_info.get("csv_hash", ""), str(csv_info["csv_path"]))
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            items.append({
+                "version": ver,
+                "hash": run_dir.name,
+                "created_at": _format_timestamp(meta.get("created_at", "")),
+                "judge_model": meta.get("judge_model", "-"),
+                "judge_provider": meta.get("judge_provider", "-"),
+                "csv_hash": csv_info.get("csv_hash", ""),
+                "csv_filename": csv_info.get("csv_filename", csv_info["csv_path"].name),
+                "csv_path": str(csv_info["csv_path"]),
+            })
+    return items
+
+
 def _get_eval_history(project, prompt_id: str, version: str) -> list:
     import json as _j
     judge_dir = project.root / ".pvm" / "prompts" / prompt_id / "versions" / version / "judge"
@@ -814,7 +937,10 @@ def _get_eval_history(project, prompt_id: str, version: str) -> list:
             "csv_hash": csv_hash,
             "csv_filename": csv_filename,
             "step_status": step_status,
-            "metrics": judge_data.get("metrics") if judge_data else None,
+            "metrics": _augment_eval_metrics(
+                judge_data.get("metrics") if judge_data else None,
+                (judge_data or {}).get("results", []),
+            ),
             "partial": (judge_data or {}).get("partial", False),
             "result_count": len((judge_data or {}).get("results", [])),
             "eval_url_base": f"/prompts/{prompt_id}/version/{version}/eval/{run_dir.name}",
@@ -890,6 +1016,12 @@ def eval_api_reusable_runs(prompt_id: str, version: str):
     return JSONResponse(_eval_runs_with_criteria(project, prompt_id))
 
 
+@app.get("/prompts/{prompt_id}/version/{version}/eval/api/reusable-csvs")
+def eval_api_reusable_csvs(prompt_id: str, version: str):
+    project = get_project()
+    return JSONResponse(_eval_reusable_csvs(project, prompt_id))
+
+
 @app.get("/prompts/{prompt_id}/version/{version}/eval/new", response_class=HTMLResponse)
 def eval_new_form(request: Request, prompt_id: str, version: str):
     project = get_project()
@@ -908,37 +1040,70 @@ async def eval_start(
     request: Request,
     prompt_id: str,
     version: str,
-    csv_file: UploadFile = File(...),
+    csv_file: UploadFile | None = File(None),
     provider: str = Form("openai"),
     model: str = Form("gpt-4.1"),
     judge_type: str = Form("pointwise"),
     reuse_run_hash: str = Form(""),
     reuse_from_version: str = Form(""),
+    reuse_csv_hash: str = Form(""),
 ):
     project = get_project()
 
-    from pvm.eval_pipeline.pvm_storage import register_csv, create_pipeline_run
+    from pvm.eval_pipeline.pvm_storage import create_pipeline_run, register_csv
     prompt_data = project.get_prompt(prompt_id, version=version)
     system_prompt = prompt_data.get("prompt", "")
     pvm_dir = _pvm_dir(project)
 
-    # CSV 등록
-    import tempfile, json as _json2
-    content = await csv_file.read()
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-        tmp.write(content)
-        tmp_csv = Path(tmp.name)
+    # CSV 결정: 새 업로드 또는 기존 등록 CSV 재사용
+    import json as _json2
+    registered_csv: Path | None = None
+    csv_hash = ""
+    if reuse_csv_hash:
+        candidate = pvm_dir / "datasets" / reuse_csv_hash / "data.csv"
+        if not candidate.exists():
+            return _render(
+                request,
+                "eval_start.html",
+                info=project.get_prompt_info(prompt_id),
+                version=version,
+                prompt_data=prompt_data,
+                eval_configured=is_configured(),
+                error="선택한 기존 CSV를 찾을 수 없습니다. 다시 선택해주세요.",
+            )
+        csv_hash = reuse_csv_hash
+        registered_csv = candidate
+    else:
+        if csv_file is None or not csv_file.filename:
+            return _render(
+                request,
+                "eval_start.html",
+                info=project.get_prompt_info(prompt_id),
+                version=version,
+                prompt_data=prompt_data,
+                eval_configured=is_configured(),
+                error="새 CSV를 업로드하거나 기존 CSV를 선택해주세요.",
+            )
 
-    csv_hash, registered_csv = register_csv(pvm_dir, tmp_csv)
-    tmp_csv.unlink(missing_ok=True)
+        import tempfile
 
-    # 업로드된 실제 파일명으로 meta.json 갱신 (임시파일명 덮어쓰기)
-    if csv_file.filename:
-        meta_path = pvm_dir / "datasets" / csv_hash / "meta.json"
-        if meta_path.exists():
-            _meta = _json2.loads(meta_path.read_text(encoding="utf-8"))
-            _meta["original_name"] = csv_file.filename
-            meta_path.write_text(_json2.dumps(_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        content = await csv_file.read()
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+            tmp.write(content)
+            tmp_csv = Path(tmp.name)
+
+        csv_hash, registered_csv = register_csv(pvm_dir, tmp_csv)
+        tmp_csv.unlink(missing_ok=True)
+
+        # 업로드된 실제 파일명으로 meta.json 갱신 (임시파일명 덮어쓰기)
+        if csv_file.filename:
+            meta_path = pvm_dir / "datasets" / csv_hash / "meta.json"
+            if meta_path.exists():
+                _meta = _json2.loads(meta_path.read_text(encoding="utf-8"))
+                _meta["original_name"] = csv_file.filename
+                meta_path.write_text(_json2.dumps(_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    assert registered_csv is not None
 
     # 파이프라인 실행 디렉토리 생성
     pipeline_hash, run_dir = create_pipeline_run(
@@ -1357,18 +1522,16 @@ def _compare_available_runs(project, prompt_id: str, version: str) -> list:
             meta = _json.loads(meta_path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        csv_hash = meta.get("csv_hash", "")
-        if not csv_hash:
-            continue
-        csv_path = project.root / ".pvm" / "datasets" / csv_hash / "data.csv"
-        if not csv_path.exists():
+        csv_info = _resolve_run_csv_info(project, run_dir, meta)
+        if csv_info is None:
             continue
         step_status = get_run_status(run_dir)
         runs.append({
             "hash": run_dir.name,
             "created_at": _format_timestamp(meta.get("created_at", "")),
             "judge_model": meta.get("judge_model", ""),
-            "csv_hash": csv_hash,
+            "csv_hash": csv_info.get("csv_hash", ""),
+            "csv_filename": csv_info.get("csv_filename", csv_info["csv_path"].name),
             "step3_done": step_status["step3"],
         })
     return runs
@@ -1385,11 +1548,15 @@ def _build_pairwise_csv(
     pvm_dir = project.root / ".pvm"
 
     def _csv_for_run(version: str, run_hash: str) -> Path:
+        run_dir = pvm_dir / "prompts" / prompt_id / "versions" / version / "judge" / run_hash
         meta = _json.loads(
-            (pvm_dir / "prompts" / prompt_id / "versions" / version / "judge" / run_hash / "pipeline_meta.json")
+            (run_dir / "pipeline_meta.json")
             .read_text(encoding="utf-8")
         )
-        return pvm_dir / "datasets" / meta["csv_hash"] / "data.csv"
+        csv_info = _resolve_run_csv_info(project, run_dir, meta)
+        if csv_info is None:
+            raise FileNotFoundError(f"CSV를 찾을 수 없음: {run_dir}")
+        return csv_info["csv_path"]
 
     csv_a = _csv_for_run(version_a, run_a_hash)
     csv_b = _csv_for_run(version_b, run_b_hash)

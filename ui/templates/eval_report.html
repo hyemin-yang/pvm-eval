@@ -21,8 +21,9 @@
 
   <!-- 메트릭 카드 -->
   {% set conf = m.get('confusion') or {} %}
-  {% set pass_cnt = (conf.get('tp', 0) + conf.get('fp', 0)) %}
-  {% set pr = (pass_cnt / m.valid * 100) if m.valid else 0 %}
+  {% set pass_cnt = m.get('pass_count', (conf.get('tp', 0) + conf.get('fp', 0))) %}
+  {% set judged_total = m.get('judged_total', m.get('valid', 0)) %}
+  {% set pr = (m.get('pass_rate', 0) * 100) if judged_total else 0 %}
   <div class="grid grid-cols-2 gap-4 mb-8
               {% if judge_data.get('judge_type') == 'pointwise' %}sm:grid-cols-4{% endif %}">
 
@@ -30,7 +31,12 @@
       <div class="text-3xl font-bold text-indigo-700">{{ "%.1f"|format(pr) }}%</div>
       <div class="text-xs text-indigo-500 mt-1 font-medium">Pass Rate</div>
       <div class="text-xs text-indigo-400 mt-0.5">
-        {{ pass_cnt }}/{{ m.get('valid', '-') }}건 · 정확도 {{ "%.1f"|format((m.accuracy or 0) * 100) }}%
+        {{ pass_cnt }}/{{ judged_total if judged_total else '-' }}건
+        {% if m.get('valid', 0) > 0 %}
+        · 정확도 {{ "%.1f"|format((m.accuracy or 0) * 100) }}%
+        {% else %}
+        · human label 없음
+        {% endif %}
       </div>
     </div>
 

@@ -105,17 +105,23 @@
         <!-- 오른쪽: Pass Rate + 버튼 -->
         <div class="flex items-center gap-3 flex-shrink-0">
           {% if m %}
-          {% set conf = m.get('confusion', {}) %}
-          {% set valid = m.get('valid') or 0 %}
-          {% set judge_pass_cnt = (conf.get('tp', 0) + conf.get('fp', 0)) %}
-          {% set pr = (judge_pass_cnt / valid * 100) if valid else 0 %}
+          {% set judge_pass_cnt = m.get('pass_count', 0) %}
+          {% set judged_total = m.get('judged_total', 0) %}
+          {% set pr = (m.get('pass_rate', 0) * 100) if judged_total else 0 %}
           {% set acc = (m.get('accuracy') or 0) * 100 %}
           <div class="text-right">
             <div class="text-2xl font-bold font-mono text-indigo-600">
               {{ "%.1f"|format(pr) }}%
             </div>
             <div class="text-xs text-gray-400 mt-0.5">Pass Rate</div>
-            <div class="text-xs text-gray-400 font-mono mt-0.5">정확도 {{ "%.1f"|format(acc) }}%</div>
+            <div class="text-xs text-gray-400 font-mono mt-0.5">
+              {{ judge_pass_cnt }}/{{ judged_total if judged_total else '-' }}건
+              {% if m.get('valid', 0) > 0 %}
+              · 정확도 {{ "%.1f"|format(acc) }}%
+              {% else %}
+              · human label 없음
+              {% endif %}
+            </div>
           </div>
           {% else %}
           <div class="text-right text-gray-300">

@@ -39,6 +39,7 @@
     <input type="hidden" name="judge_type" value="pointwise">
     <input type="hidden" name="reuse_run_hash" id="reuse-run-hash" value="">
     <input type="hidden" name="reuse_from_version" id="reuse-from-version" value="">
+    <input type="hidden" name="reuse_csv_hash" id="reuse-csv-hash" value="">
 
     <!-- Criteria 재사용 -->
     <div>
@@ -65,6 +66,34 @@
           <option value="">-- 재사용할 criteria 선택 --</option>
         </select>
         <div id="reuse-preview" class="hidden mt-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-700 leading-relaxed"></div>
+      </div>
+    </div>
+
+    <!-- CSV 재사용 -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <label class="text-sm font-medium text-gray-700">이전 CSV 재사용</label>
+        <button type="button" id="csv-reuse-toggle"
+                onclick="toggleCsvReuse()"
+                class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-200 transition-colors focus:outline-none">
+          <span id="csv-reuse-thumb"
+                class="inline-block h-3.5 w-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform"></span>
+        </button>
+      </div>
+      <p class="text-xs text-gray-400">이전에 업로드한 CSV를 다시 선택해 새 평가에 재사용할 수 있습니다.</p>
+
+      <div id="csv-reuse-panel" class="hidden mt-3">
+        <div id="csv-reuse-loading" class="text-xs text-gray-400">목록 불러오는 중...</div>
+        <div id="csv-reuse-empty" class="hidden text-xs text-orange-500">
+          재사용 가능한 CSV가 없습니다. 먼저 CSV를 한 번 업로드해 평가를 실행해주세요.
+        </div>
+        <select id="csv-reuse-select"
+                class="hidden w-full text-sm border border-gray-300 rounded-lg px-3 py-2
+                       focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                onchange="onCsvReuseSelect(this)">
+          <option value="">-- 재사용할 CSV 선택 --</option>
+        </select>
+        <div id="csv-reuse-preview" class="hidden mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-700 leading-relaxed"></div>
       </div>
     </div>
 
@@ -97,12 +126,12 @@
       <label class="block text-sm font-medium text-gray-700 mb-1">
         레이블링된 CSV 파일 <span class="text-red-500">*</span>
       </label>
-      <input type="file" name="csv_file" accept=".csv" required
+      <input type="file" name="csv_file" id="csv-file-input" accept=".csv" required
              class="w-full text-sm text-gray-600 border border-gray-300 rounded-lg px-3 py-2
                     file:mr-3 file:py-1 file:px-3 file:rounded file:border-0
                     file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700
                     hover:file:bg-indigo-100">
-      <p class="text-xs text-gray-400 mt-1">컬럼: trace_id, user_input, llm_output, pass_fail, critique 등</p>
+      <p id="csv-file-help" class="text-xs text-gray-400 mt-1">컬럼: trace_id, user_input, llm_output, pass_fail, critique 등</p>
     </div>
 
     <!-- 시스템 프롬프트 미리보기 -->
@@ -168,6 +197,8 @@ onProviderChange();
 // ── Criteria 재사용 ──
 let _reuseOn = false;
 let _reuseRuns = [];
+let _csvReuseOn = false;
+let _reusableCsvs = [];
 
 function toggleReuse() {
   _reuseOn = !_reuseOn;
@@ -230,5 +261,79 @@ function clearReuse() {
   const sel = document.getElementById('reuse-select');
   if (sel) sel.value = '';
 }
+
+function syncCsvInputMode() {
+  const fileInput = document.getElementById('csv-file-input');
+  const helpEl = document.getElementById('csv-file-help');
+  if (_csvReuseOn && document.getElementById('reuse-csv-hash').value) {
+    fileInput.required = false;
+    helpEl.textContent = '기존 등록 CSV를 재사용합니다. 새 파일 업로드는 선택 사항입니다.';
+  } else {
+    fileInput.required = true;
+    helpEl.textContent = '컬럼: trace_id, user_input, llm_output, pass_fail, critique 등';
+  }
+}
+
+function toggleCsvReuse() {
+  _csvReuseOn = !_csvReuseOn;
+  const toggle = document.getElementById('csv-reuse-toggle');
+  const thumb  = document.getElementById('csv-reuse-thumb');
+  const panel  = document.getElementById('csv-reuse-panel');
+  toggle.classList.toggle('bg-emerald-500', _csvReuseOn);
+  toggle.classList.toggle('bg-gray-200', !_csvReuseOn);
+  thumb.classList.toggle('translate-x-4', _csvReuseOn);
+  thumb.classList.toggle('translate-x-0.5', !_csvReuseOn);
+  panel.classList.toggle('hidden', !_csvReuseOn);
+  if (_csvReuseOn && _reusableCsvs.length === 0) loadReusableCsvs();
+  if (!_csvReuseOn) clearCsvReuse();
+  syncCsvInputMode();
+}
+
+function loadReusableCsvs() {
+  const loadingEl = document.getElementById('csv-reuse-loading');
+  const emptyEl   = document.getElementById('csv-reuse-empty');
+  const selectEl  = document.getElementById('csv-reuse-select');
+  loadingEl.classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+  selectEl.classList.add('hidden');
+
+  fetch('/prompts/{{ info.id }}/version/{{ version }}/eval/api/reusable-csvs')
+    .then(r => r.json())
+    .then(items => {
+      _reusableCsvs = items;
+      loadingEl.classList.add('hidden');
+      if (items.length === 0) { emptyEl.classList.remove('hidden'); return; }
+      selectEl.innerHTML = '<option value="">-- 재사용할 CSV 선택 --</option>';
+      items.forEach((item, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `v${item.version}  |  ${item.created_at}  |  ${item.csv_filename}`;
+        selectEl.appendChild(opt);
+      });
+      selectEl.classList.remove('hidden');
+    })
+    .catch(() => { loadingEl.classList.add('hidden'); emptyEl.classList.remove('hidden'); });
+}
+
+function onCsvReuseSelect(sel) {
+  const previewEl = document.getElementById('csv-reuse-preview');
+  if (!sel.value) { clearCsvReuse(); return; }
+  const item = _reusableCsvs[parseInt(sel.value)];
+  document.getElementById('reuse-csv-hash').value = item.csv_hash || '';
+  previewEl.textContent =
+    `파일: ${item.csv_filename}\n생성: ${item.created_at}\n출처 버전: v${item.version}\n실행: ${item.hash.slice(0, 8)}`;
+  previewEl.classList.remove('hidden');
+  syncCsvInputMode();
+}
+
+function clearCsvReuse() {
+  document.getElementById('reuse-csv-hash').value = '';
+  document.getElementById('csv-reuse-preview').classList.add('hidden');
+  const sel = document.getElementById('csv-reuse-select');
+  if (sel) sel.value = '';
+  syncCsvInputMode();
+}
+
+syncCsvInputMode();
 </script>
 {% endblock %}

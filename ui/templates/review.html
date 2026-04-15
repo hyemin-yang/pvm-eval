@@ -939,7 +939,7 @@ async function saveLabel(pass_fail, critique, category, few_shot_type) {
   if (!pass_fail && !critique && !category && !few_shot_type) return;
   labels[String(t.id)] = { pass_fail, critique, category, few_shot_type };
   try {
-    await fetch('/review/api/labels', {
+    await fetch(REVIEW_API_BASE + '/labels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: t.id, pass_fail, critique, category, few_shot_type }),
@@ -1193,7 +1193,7 @@ async function doSetupUpload() {
   }
   btn.disabled = true; btn.textContent = '업로드 중...';
   try {
-    const res = await fetch('/review/api/upload', {
+    const res = await fetch(REVIEW_API_BASE + '/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1248,7 +1248,7 @@ document.getElementById('setup-col-id').addEventListener('change', renderPreview
 async function finishUpload(resetLabels) {
   closeModal('upload-modal');
   if (resetLabels) {
-    await fetch('/review/api/labels/reset', { method: 'POST' });
+    await fetch(REVIEW_API_BASE + '/labels/reset', { method: 'POST' });
     labels = {};
     categories = [];
   }
@@ -1303,7 +1303,7 @@ document.getElementById('btn-ai-improve').addEventListener('click', async () => 
   btn.textContent = '⏳ 개선 중...';
 
   try {
-    const res = await fetch('/review/api/improve', {
+    const res = await fetch(REVIEW_API_BASE + '/improve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1382,7 +1382,7 @@ document.addEventListener('keydown', (e) => {
     case 'u': case 'U':
       if (lastAction) {
         labels[String(lastAction.id)] = lastAction.prev;
-        fetch('/review/api/labels', {
+        fetch(REVIEW_API_BASE + '/labels', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: lastAction.id, category: '', ...lastAction.prev }),

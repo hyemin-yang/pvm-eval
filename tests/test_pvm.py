@@ -110,6 +110,32 @@ def test_init_twice_raises(tmp_path: Path) -> None:
         project.init("demo-project")
 
 
+def test_destroy_removes_installed_claude_skills(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+
+    skills_dir = tmp_path / ".claude" / "skills"
+    assert skills_dir.exists()
+
+    project.destroy()
+
+    assert not (tmp_path / ".pvm").exists()
+    assert not skills_dir.exists()
+
+
+def test_init_replaces_existing_skill_symlink(tmp_path: Path) -> None:
+    skills_dir = tmp_path / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    skill_link = skills_dir / "judge-prompt-generation"
+    skill_link.symlink_to(tmp_path / "some-old-skill-target")
+
+    project = PVMProject(tmp_path)
+    project.init("demo-project")
+
+    assert skill_link.exists()
+    assert not skill_link.is_symlink()
+    assert (skill_link / "SKILL.md").exists()
+
+
 def test_add_first_version(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     template = tmp_path / "prompt.yaml"

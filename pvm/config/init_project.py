@@ -105,6 +105,15 @@ def _install_claude_skills(root: Path) -> None:
         if not skill_src.is_dir():
             continue
         skill_dest = skills_dest / skill_src.name
-        if skill_dest.exists():
-            shutil.rmtree(skill_dest)
+        if skill_dest.exists() or skill_dest.is_symlink():
+            _remove_path(skill_dest)
         shutil.copytree(skill_src, skill_dest, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
+
+
+def _remove_path(path: Path) -> None:
+    """Remove a file, symlink, or directory safely."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+        return
+    if path.exists():
+        shutil.rmtree(path)
