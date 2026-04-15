@@ -15,7 +15,7 @@
 | **웹 UI** | 프롬프트 목록·diff·배포·평가·비교를 브라우저에서 조작 |
 | **LLM Judge 평가** | human-labeled CSV → 에러 분석 → Judge criteria 자동 생성 → Judge 실행 → 정확도/혼동행렬 리포트 |
 | **A/B 버전 비교** | 두 프롬프트 버전을 동일 데이터로 나란히 평가해 우열 비교 |
-| **Criteria 재사용** | 이미 생성된 Judge criteria를 다른 버전 평가에 그대로 재사용 |
+| **라벨링** | LLM 응답 CSV를 업로드해 브라우저에서 Pass/Fail 라벨링 후 labeled CSV로 내보내기 |
 
 ---
 
@@ -35,21 +35,24 @@ pipx install .
 pipx install "git+https://github.com/hyemin-yang/pvm-eval.git@main#subdirectory=prompt_versioning_manager"
 ```
 
-### 재설치 (소스 수정 후)
-
-```bash
-pipx reinstall pvm
-```
-
 ### API 키 설정
 
-Judge 평가 기능을 사용하려면 `.env` 파일(또는 환경변수)에 API 키를 설정합니다.
+Judge 평가 기능을 사용하려면 Anthropic, OpenAI, 또는 Google Gemini API 키가 필요합니다.
+
+**방법 1 — `.env` 파일 (로컬 개발용)**
+
+프로젝트 작업 디렉토리에 `.env` 파일을 생성합니다.
 
 ```bash
-# 프로젝트 작업 디렉토리에 .env 생성
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...
 ```
+
+**방법 2 — 웹 UI에서 직접 입력**
+
+서버 실행 후 브라우저에서 사이드바의 **🔑 API Key 설정** 메뉴를 통해 입력할 수 있습니다.  
+입력한 키는 `.pvm/api_keys.env`에 저장됩니다.
 
 ---
 
@@ -93,7 +96,72 @@ pvm get intent_classifier
 
 ---
 
-## 자주 쓰는 CLI 명령어
+## 사용 방법
+
+이하 기능들은 **웹 UI**, **Claude Skills**, **CLI 명령어** 세 가지 방법으로 이용할 수 있습니다.
+
+---
+
+### 1) 웹 UI
+
+```bash
+pvm ui           # 기본 포트 8001
+pvm ui --port {포트번호}
+```
+
+브라우저에서 `http://127.0.0.1:{포트번호}` 접속.
+
+**지원 기능:**
+
+| 기능 | 설명 |
+|---|---|
+| 프롬프트 버전 관리 | 버전 추가·배포·롤백·삭제, 버전 간 diff |
+| 인라인 에디터 | 브라우저에서 직접 작성 또는 파일 업로드 |
+| 라벨링 | LLM 응답 CSV를 업로드해 Pass/Fail 라벨링 후 labeled CSV로 내보내기 |
+| LLM Judge 평가 | CSV 업로드 → 에러 분석 → criteria 생성 → Judge 실행 → 리포트 |
+| Criteria 직접 편집 | 생성된 criteria를 UI에서 수정 후 저장, 이후 재사용 가능 |
+| 실패 사례 조회 | 카테고리별 실패 트레이스를 바로 확인 |
+| Criteria 재사용 | 이전 평가에서 생성한 criteria를 불러와 Step 3 바로 실행 |
+| A/B 버전 비교 | 두 버전을 동일 데이터로 비교 평가 |
+| 평가 이력 관리 | 실행별 Pass Rate·정확도 조회, 삭제 |
+| 스냅샷 | 프로젝트 전체 상태 저장·비교 |
+| API Key 설정 | `.env` 없이 UI에서 직접 키 입력 |
+
+**LLM Judge 평가 파이프라인 (Step 1 → 3):**
+
+```
+Step 1  에러 분석      — 실패 케이스를 카테고리별로 분류, 실패 건수 및 사례 확인
+Step 2  Judge 프롬프트 — 카테고리별 criteria 및 통합 Judge 프롬프트 생성, criteria 직접 편집 가능
+Step 3  Judge 실행     — 전체 데이터 평가, 정확도·혼동행렬·F1 산출
+```
+
+평가에 사용하는 CSV는 LLM 응답에 사람이 직접 Pass/Fail 라벨을 달아둔 데이터입니다.  
+위의 **라벨링** 기능으로 만들거나, 직접 작성한 CSV를 업로드할 수 있습니다.  
+필수 컬럼은 `trace_id`, `user_input`(또는 `conversation`), `llm_output`, `pass_fail`이며 나머지는 선택입니다.
+
+| 컬럼 | 필수 | 설명 |
+|---|:---:|---|
+| `trace_id` | ✓ | 트레이스 식별자 |
+| `user_input` | ✓ | 사용자 입력 (`conversation` 컬럼으로 대체 가능) |
+| `llm_output` | ✓ | 모델 응답 |
+| `pass_fail` | ✓ | 사람 레이블 (`Pass` / `Fail`) |
+| `critique` | | 사람 판정 이유 — 있으면 Judge few-shot 예시 선정 시 우선 활용 |
+| `category` | | 실패 카테고리 — 에러 분석 단계에서 참고용으로 사용 |
+
+---
+
+### 2) Claude Skills
+
+Claude Code에서 `/judge-prompt-generation`, `/prompt-versioning-manager` 스킬을 통해 대화 형태로 파이프라인을 실행할 수 있습니다.
+
+```
+/judge-prompt-generation   # Judge 평가 파이프라인 실행
+/prompt-versioning-manager # 프롬프트 버전 관리
+```
+
+---
+
+### 3) CLI 명령어
 
 ```bash
 pvm init                       # 프로젝트 초기화 (.pvm/ 생성)
@@ -108,71 +176,9 @@ pvm snapshot create            # 전체 프로젝트 스냅샷
 pvm project                    # 프로젝트 트리 요약
 pvm token-count <id> <ver>     # 프롬프트 토큰 수 계산
 pvm delete <id>                # 프롬프트 전체 삭제
+pvm destroy                    # .pvm/ 디렉토리 전체 삭제 (프로젝트 초기화)
 pvm ui                         # 웹 UI 실행
 ```
-
----
-
-## 웹 UI
-
-프로젝트 디렉토리에서:
-
-```bash
-pvm ui
-# 기본 포트: 8001
-pvm ui --port 9000
-```
-
-브라우저에서 `http://127.0.0.1:8001` 접속.
-
-### UI에서 할 수 있는 것
-
-#### 프롬프트 관리
-- 프롬프트 목록·버전별 내용 확인
-- 버전 간 diff (나란히 비교)
-- deploy / rollback 조작
-- 개별 버전 삭제 (마지막 버전은 보호)
-- 인라인 에디터로 직접 작성 또는 파일 업로드
-
-#### LLM Judge 평가 (3단계 파이프라인)
-
-human-labeled CSV 파일을 업로드하면, LLM이 자동으로 Judge criteria를 만들고 평가를 실행합니다.
-
-```
-Step 1  에러 분석     — 실패 케이스를 카테고리별로 분류
-Step 2  Judge 프롬프트 — 카테고리별 criteria 및 통합 Judge 프롬프트 생성
-Step 3  Judge 실행    — 전체 데이터 평가, 정확도·혼동행렬·F1 산출
-```
-
-- **Pass Rate** (Judge가 Pass로 판정한 비율)와 **정확도** (Judge↔Human 일치율)를 메인 지표로 표시
-- 혼동 행렬(TP/FP/FN/TN), Precision, Recall, F1 Score 제공
-- 트레이스별 결과 테이블 — 행 클릭 시 Judge 판정 상세 전개
-- **Criteria 재사용**: 동일 프롬프트의 다른 버전, 또는 재평가 시 기존에 생성한 criteria를 그대로 가져와 Step 1·2를 건너뛰고 바로 Step 3 실행
-- 평가 이력 관리 — 실행별 삭제 가능 (CSV 데이터는 보존)
-
-CSV 컬럼 형식:
-
-| 컬럼 | 설명 |
-|---|---|
-| `trace_id` | 트레이스 식별자 |
-| `user_input` | 사용자 입력 |
-| `llm_output` | 모델 응답 |
-| `pass_fail` | 사람 레이블 (`Pass` / `Fail`) |
-| `critique` | 사람 판정 이유 (선택) |
-| `category` | 실패 카테고리 (선택) |
-
-#### A/B 버전 비교
-
-두 프롬프트 버전의 응답을 동일 Judge로 나란히 평가해 우열을 비교합니다.
-
-- 동일 프롬프트의 두 버전(A·B)을 선택
-- 기존 평가 데이터 재활용 또는 새 CSV 업로드
-- Judge 모델 선택 후 3단계 파이프라인 동일하게 실행
-- 리포트: A 승 / 동점 / B 승 비율 카드 + 트레이스별 필터
-
-#### 스냅샷
-- 전체 프로젝트 상태를 시점 단위로 저장
-- 스냅샷 간 diff 비교
 
 ---
 
@@ -182,14 +188,14 @@ CSV 컬럼 형식:
 
 ```
 pvm/eval_pipeline/
-├── step0_generate_config.py    # CSV + system prompt → config.yaml
-├── step1_error_analysis.py     # 실패 카테고리 도출, 트레이스 라벨링
+├── step0_generate_config.py         # CSV + system prompt → config.yaml
+├── step1_error_analysis.py          # 실패 카테고리 도출, 트레이스 라벨링
 ├── step2_generate_judge_prompts.py  # criteria YAML + Judge 프롬프트 생성
-├── step3_run_judge.py          # Judge 실행, 메트릭 산출
-├── judge_composer.py           # JudgePromptComposer
-├── llm_client.py               # Anthropic / OpenAI 클라이언트
-├── pvm_storage.py              # .pvm/ 디렉토리 구조 관리
-└── prompts/                    # 메타 프롬프트 (.md)
+├── step3_run_judge.py               # Judge 실행, 메트릭 산출
+├── judge_composer.py                # JudgePromptComposer
+├── llm_client.py                    # Anthropic / OpenAI / Gemini 클라이언트
+├── pvm_storage.py                   # .pvm/ 디렉토리 구조 관리
+└── prompts/                         # 메타 프롬프트 (.md)
 ```
 
 평가 결과는 `.pvm/prompts/{id}/versions/{ver}/judge/{hash}/` 아래에 저장됩니다.  
@@ -202,6 +208,7 @@ pvm/eval_pipeline/
 ```
 .pvm/
 ├── config.json                        # 프로젝트 설정
+├── api_keys.env                       # UI에서 입력한 API 키 (자동 .gitignore 처리)
 ├── datasets/
 │   └── {csv_hash}/
 │       ├── data.csv
@@ -215,6 +222,8 @@ pvm/eval_pipeline/
                     └── {pipeline_hash}/
                         ├── error_analysis.json
                         ├── judge_components/
+                        │   ├── judge.yaml          # 현재 criteria
+                        │   └── *_judge_{ts}.yaml   # 수정·저장된 criteria 이력
                         └── judge_results.json
 ```
 

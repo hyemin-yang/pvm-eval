@@ -1506,6 +1506,17 @@ def _compare_run_dir(project, prompt_id: str, compare_hash: str) -> Path:
     return project.root / ".pvm" / "prompts" / prompt_id / "compare" / compare_hash
 
 
+_JOIN_KEY_CANDIDATES = [
+    "trace_id",
+    "scenario_id",
+    "id",
+    "sample_id",
+    "row_id",
+    "index",
+    "conversation_id",
+]
+
+
 def _compare_available_runs(project, prompt_id: str, version: str) -> list:
     """버전에서 CSV가 있는 eval 실행 목록 반환."""
     runs = []
@@ -1537,59 +1548,117 @@ def _compare_available_runs(project, prompt_id: str, version: str) -> list:
     return runs
 
 
+def _compare_csv_path(project, prompt_id: str, version: str, run_hash: str) -> Path:
+    run_dir = _pvm_dir(project) / "prompts" / prompt_id / "versions" / version / "judge" / run_hash
+    meta = _json.loads((run_dir / "pipeline_meta.json").read_text(encoding="utf-8"))
+    csv_info = _resolve_run_csv_info(project, run_dir, meta)
+    if csv_info is None:
+        raise FileNotFoundError(f"CSV를 찾을 수 없음: {run_dir}")
+    return csv_info["csv_path"]
+
+
+def _load_csv_rows_and_columns(csv_path: Path) -> tuple[list[dict], list[str]]:
+    import csv as _cm
+
+    with open(csv_path, encoding="utf-8-sig") as f:
+        rows = list(_cm.DictReader(f))
+    columns = list(rows[0].keys()) if rows else []
+    return rows, columns
+
+
+def _normalize_join_value(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _match_count_for_keys(rows_a: list[dict], key_a: str, rows_b: list[dict], key_b: str) -> tuple[int, int, int]:
+    keys_a = {_normalize_join_value(row.get(key_a, "")) for row in rows_a}
+    keys_a.discard("")
+    keys_b = {_normalize_join_value(row.get(key_b, "")) for row in rows_b}
+    keys_b.discard("")
+    matched = len(keys_a & keys_b)
+    return matched, len(keys_a - keys_b), len(keys_b - keys_a)
+
+
+def _detect_compare_join_keys(rows_a: list[dict], cols_a: list[str], rows_b: list[dict], cols_b: list[str]) -> dict:
+    shared_candidates = [col for col in _JOIN_KEY_CANDIDATES if col in cols_a and col in cols_b]
+    candidates: list[dict] = []
+    for col in shared_candidates:
+        matched, only_a, only_b = _match_count_for_keys(rows_a, col, rows_b, col)
+        candidates.append({
+            "key_a": col,
+            "key_b": col,
+            "matched": matched,
+            "only_a": only_a,
+            "only_b": only_b,
+        })
+
+    candidates.sort(
+        key=lambda item: (
+            item["matched"],
+            -_JOIN_KEY_CANDIDATES.index(item["key_a"]) if item["key_a"] in _JOIN_KEY_CANDIDATES else 0,
+        ),
+        reverse=True,
+    )
+
+    recommended = next((item for item in candidates if item["matched"] > 0), None)
+    return {
+        "columns_a": cols_a,
+        "columns_b": cols_b,
+        "candidates": candidates,
+        "recommended": recommended,
+    }
+
+
 def _build_pairwise_csv(
     project, prompt_id: str,
     version_a: str, run_a_hash: str,
     version_b: str, run_b_hash: str,
     compare_dir: Path,
+    join_key_a: str | None = None,
+    join_key_b: str | None = None,
 ) -> tuple:
     """두 eval run의 CSV를 trace_id 기준으로 조인해 pairwise CSV를 생성한다."""
     import csv as _cm
-    pvm_dir = project.root / ".pvm"
+    csv_a = _compare_csv_path(project, prompt_id, version_a, run_a_hash)
+    csv_b = _compare_csv_path(project, prompt_id, version_b, run_b_hash)
+    rows_a_raw, cols_a = _load_csv_rows_and_columns(csv_a)
+    rows_b_raw, cols_b = _load_csv_rows_and_columns(csv_b)
 
-    def _csv_for_run(version: str, run_hash: str) -> Path:
-        run_dir = pvm_dir / "prompts" / prompt_id / "versions" / version / "judge" / run_hash
-        meta = _json.loads(
-            (run_dir / "pipeline_meta.json")
-            .read_text(encoding="utf-8")
-        )
-        csv_info = _resolve_run_csv_info(project, run_dir, meta)
-        if csv_info is None:
-            raise FileNotFoundError(f"CSV를 찾을 수 없음: {run_dir}")
-        return csv_info["csv_path"]
+    if not join_key_a or not join_key_b:
+        detection = _detect_compare_join_keys(rows_a_raw, cols_a, rows_b_raw, cols_b)
+        recommended = detection.get("recommended")
+        if recommended is None:
+            raise ValueError("자동으로 일치하는 join key를 찾지 못했습니다. 수동으로 선택해주세요.")
+        join_key_a = recommended["key_a"]
+        join_key_b = recommended["key_b"]
 
-    csv_a = _csv_for_run(version_a, run_a_hash)
-    csv_b = _csv_for_run(version_b, run_b_hash)
-
-    rows_a: dict = {}
-    with open(csv_a, encoding="utf-8-sig") as f:
-        for row in _cm.DictReader(f):
-            tid = (row.get("trace_id") or row.get("scenario_id") or "").strip()
-            if tid:
-                rows_a[tid] = row
+    rows_a: dict[str, dict] = {}
+    for row in rows_a_raw:
+        tid = _normalize_join_value(row.get(join_key_a, ""))
+        if tid:
+            rows_a[tid] = row
 
     combined = []
     only_b = 0
-    with open(csv_b, encoding="utf-8-sig") as f:
-        for row_b in _cm.DictReader(f):
-            tid = (row_b.get("trace_id") or row_b.get("scenario_id") or "").strip()
-            if not tid:
-                continue
-            row_a = rows_a.pop(tid, None)
-            if row_a is None:
-                only_b += 1
-                continue
-            combined.append({
-                "trace_id": tid,
-                "scenario_id": row_b.get("scenario_id", row_a.get("scenario_id", "")),
-                "user_input": row_a.get("user_input", ""),
-                "response_a": row_a.get("llm_output", ""),   # version A 응답
-                "llm_output": row_b.get("llm_output", ""),   # version B 응답
-                "winner": "",
-                "human_reason": "",
-                "category": "",
-                "few_shot_type": "",
-            })
+    for row_b in rows_b_raw:
+        tid = _normalize_join_value(row_b.get(join_key_b, ""))
+        if not tid:
+            continue
+        row_a = rows_a.pop(tid, None)
+        if row_a is None:
+            only_b += 1
+            continue
+        combined.append({
+            "trace_id": tid,
+            "scenario_id": row_b.get("scenario_id", row_a.get("scenario_id", "")),
+            "user_input": row_a.get("user_input", ""),
+            "response_a": row_a.get("llm_output", ""),   # version A 응답
+            "llm_output": row_b.get("llm_output", ""),   # version B 응답
+            "winner": "",
+            "human_reason": "",
+            "category": "",
+            "few_shot_type": "",
+        })
 
     compare_dir.mkdir(parents=True, exist_ok=True)
     combined_path = compare_dir / "combined.csv"
@@ -1601,7 +1670,13 @@ def _build_pairwise_csv(
         writer.writeheader()
         writer.writerows(combined)
 
-    stats = {"matched": len(combined), "only_a": len(rows_a), "only_b": only_b}
+    stats = {
+        "matched": len(combined),
+        "only_a": len(rows_a),
+        "only_b": only_b,
+        "join_key_a": join_key_a,
+        "join_key_b": join_key_b,
+    }
     return combined_path, stats
 
 
@@ -1648,6 +1723,44 @@ def compare_api_runs(prompt_id: str, version: str):
     return JSONResponse(_compare_available_runs(project, prompt_id, version))
 
 
+@app.get("/prompts/{prompt_id}/compare/api/join-preview")
+def compare_api_join_preview(
+    prompt_id: str,
+    version_a: str,
+    run_a_hash: str,
+    version_b: str,
+    run_b_hash: str,
+    key_a: str = "",
+    key_b: str = "",
+):
+    project = get_project()
+    try:
+        csv_a = _compare_csv_path(project, prompt_id, version_a, run_a_hash)
+        csv_b = _compare_csv_path(project, prompt_id, version_b, run_b_hash)
+        rows_a, cols_a = _load_csv_rows_and_columns(csv_a)
+        rows_b, cols_b = _load_csv_rows_and_columns(csv_b)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+
+    detection = _detect_compare_join_keys(rows_a, cols_a, rows_b, cols_b)
+    preview = None
+    if key_a and key_b:
+        matched, only_a, only_b = _match_count_for_keys(rows_a, key_a, rows_b, key_b)
+        preview = {
+            "key_a": key_a,
+            "key_b": key_b,
+            "matched": matched,
+            "only_a": only_a,
+            "only_b": only_b,
+        }
+
+    return JSONResponse({
+        "ok": True,
+        **detection,
+        "preview": preview,
+    })
+
+
 @app.post("/prompts/{prompt_id}/compare/start")
 async def compare_start(request: Request, prompt_id: str):
     import hashlib
@@ -1656,10 +1769,16 @@ async def compare_start(request: Request, prompt_id: str):
     project = get_project()
     form = await request.form()
     mode = form.get("mode", "from_runs")
-    version_a = form.get("version_a", "")
-    run_a_hash = form.get("run_a_hash", "")
-    version_b = form.get("version_b", "")
-    run_b_hash = form.get("run_b_hash", "")
+    if mode == "from_runs":
+        version_a = str(form.get("version_a", ""))
+        version_b = str(form.get("version_b", ""))
+    else:
+        version_a = str(form.get("version_a_csv", ""))
+        version_b = str(form.get("version_b_csv", ""))
+    run_a_hash = str(form.get("run_a_hash", ""))
+    run_b_hash = str(form.get("run_b_hash", ""))
+    join_key_a = str(form.get("join_key_a", "")).strip()
+    join_key_b = str(form.get("join_key_b", "")).strip()
     provider = form.get("provider", "openai")
     model = form.get("model", "gpt-4.1")
 
@@ -1683,7 +1802,9 @@ async def compare_start(request: Request, prompt_id: str):
             return _err("각 버전의 eval 실행을 선택해주세요.")
         try:
             csv_path, stats = _build_pairwise_csv(
-                project, prompt_id, version_a, run_a_hash, version_b, run_b_hash, compare_dir
+                project, prompt_id, version_a, run_a_hash, version_b, run_b_hash, compare_dir,
+                join_key_a=join_key_a or None,
+                join_key_b=join_key_b or None,
             )
         except Exception as e:
             return _err(f"CSV 조인 실패: {e}")
@@ -1736,6 +1857,8 @@ async def compare_start(request: Request, prompt_id: str):
         "matched_traces": stats["matched"],
         "only_a": stats["only_a"],
         "only_b": stats["only_b"],
+        "join_key_a": stats.get("join_key_a", join_key_a),
+        "join_key_b": stats.get("join_key_b", join_key_b),
         "created_at": datetime.now(_tz3.utc).isoformat(),
     }
     (compare_dir / "compare_meta.json").write_text(
