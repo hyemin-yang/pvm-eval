@@ -278,9 +278,13 @@ def run(config_path: str) -> None:
             results.append({
                 "trace_id": trace_id,
                 "split": "eval",
+                "user_input": trace["user_input"],
+                "response_a": trace["response_a"],
+                "llm_output": trace["llm_output"],
                 "human_label": "",
                 "human_reason": trace["human_reason"],
                 "judge_verdict": verdict,
+                "judge_reason": parsed.get("explanation", ""),
                 "judge_detail": parsed,
                 "excluded_from_metrics": True,
             })
@@ -298,9 +302,13 @@ def run(config_path: str) -> None:
         results.append({
             "trace_id": trace_id,
             "split": "eval",
+            "user_input": trace["user_input"],
+            "response_a": trace["response_a"],
+            "llm_output": trace["llm_output"],
             "human_label": human_label,
             "human_reason": trace["human_reason"],
             "judge_verdict": verdict,
+            "judge_reason": parsed.get("explanation", ""),
             "judge_detail": parsed,
         })
         # 매 trace마다 증분 저장 → SIGKILL 와도 직전까지 보존

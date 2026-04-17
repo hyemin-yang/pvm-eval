@@ -123,45 +123,52 @@
       </div>
 
       <!-- 본문: 토글 -->
+      {% set tc = trace_content.get(r.get('trace_id', ''), {}) %}
       <details>
         <summary class="px-5 py-3 cursor-pointer select-none text-sm text-gray-500 hover:bg-gray-50">
           상세 보기
         </summary>
-        <div class="px-5 pb-5 pt-2">
+        <div class="px-5 pb-5 pt-2 space-y-3">
 
           <!-- 쿼리 -->
-          {% if r.get('user_input') %}
-          <div class="mb-3">
+          {% set query_text = tc.get('user_input') or r.get('user_input') %}
+          {% if query_text %}
+          <div>
             <p class="text-xs font-semibold text-gray-400 mb-1">User Input</p>
-            <p class="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-lg p-3 max-h-32 overflow-auto">{{ r.user_input }}</p>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-lg p-3 max-h-40 overflow-auto">{{ query_text }}</p>
           </div>
           {% endif %}
 
           <!-- 두 응답 비교 -->
-          <div class="grid grid-cols-2 gap-3 mb-3">
-            <div class="border border-blue-100 rounded-lg p-3
-                        {% if verdict == 'A' %}bg-blue-50{% else %}bg-white{% endif %}">
-              <p class="text-xs font-semibold text-blue-500 mb-1">
-                Response A (v{{ version_a }})
-                {% if verdict == 'A' %}<span class="ml-1">★ 승</span>{% endif %}
+          {% set resp_a = tc.get('response_a') or r.get('response_a') %}
+          {% set resp_b = tc.get('response_b') or r.get('llm_output') %}
+          {% if resp_a or resp_b %}
+          <div class="grid grid-cols-2 gap-3">
+            <div class="border rounded-lg p-3
+                        {% if verdict == 'A' %}border-blue-300 bg-blue-50{% else %}border-blue-100 bg-white{% endif %}">
+              <p class="text-xs font-semibold text-blue-500 mb-1.5">
+                Response A · v{{ version_a }}
+                {% if verdict == 'A' %}<span class="ml-1 text-blue-600">★ 승</span>{% endif %}
               </p>
-              <p class="text-xs text-gray-700 whitespace-pre-wrap max-h-40 overflow-auto">{{ r.get('response_a', '') }}</p>
+              <p class="text-xs text-gray-700 whitespace-pre-wrap max-h-48 overflow-auto leading-relaxed">{{ resp_a or '—' }}</p>
             </div>
-            <div class="border border-red-100 rounded-lg p-3
-                        {% if verdict == 'B' %}bg-red-50{% else %}bg-white{% endif %}">
-              <p class="text-xs font-semibold text-red-500 mb-1">
-                Response B (v{{ version_b }})
-                {% if verdict == 'B' %}<span class="ml-1">★ 승</span>{% endif %}
+            <div class="border rounded-lg p-3
+                        {% if verdict == 'B' %}border-red-300 bg-red-50{% else %}border-red-100 bg-white{% endif %}">
+              <p class="text-xs font-semibold text-red-500 mb-1.5">
+                Response B · v{{ version_b }}
+                {% if verdict == 'B' %}<span class="ml-1 text-red-600">★ 승</span>{% endif %}
               </p>
-              <p class="text-xs text-gray-700 whitespace-pre-wrap max-h-40 overflow-auto">{{ r.get('llm_output', '') }}</p>
+              <p class="text-xs text-gray-700 whitespace-pre-wrap max-h-48 overflow-auto leading-relaxed">{{ resp_b or '—' }}</p>
             </div>
           </div>
+          {% endif %}
 
-          <!-- Judge 이유 -->
-          {% if r.get('judge_reason') %}
+          <!-- Judge 판정 이유 -->
+          {% set explanation = r.get('judge_detail', {}).get('explanation') or r.get('judge_reason') %}
+          {% if explanation %}
           <div>
             <p class="text-xs font-semibold text-gray-400 mb-1">Judge 판정 이유</p>
-            <p class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{{ r.judge_reason }}</p>
+            <p class="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-auto">{{ explanation }}</p>
           </div>
           {% endif %}
 

@@ -46,18 +46,17 @@
     {% endfor %}
   </div>
 
-  {% if not step_status.step1 and not is_running %}
-  <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-sm text-yellow-800">
-    ⚠️ Step 1(에러 분석)을 먼저 실행해야 합니다.
-    <a href="{{ compare_url_base }}/step1" class="underline ml-1">Step 1로 이동 →</a>
-  </div>
-  {% else %}
-
   <div class="bg-white border border-gray-200 rounded-xl p-6">
     <div class="flex items-center justify-between mb-4">
       <div>
         <h2 class="text-lg font-semibold">Judge 프롬프트 생성</h2>
-        <p class="text-sm text-gray-500 mt-0.5">비교 기준을 바탕으로 pairwise judge criteria와 few-shot 예시를 구성합니다.</p>
+        <p class="text-sm text-gray-500 mt-0.5">
+          {% if compare_meta.get('criteria_source_run_hash') %}
+          기존 criteria를 재사용해 pairwise judge criteria와 few-shot 예시를 구성합니다.
+          {% else %}
+          CSV의 critique/category를 바탕으로 pairwise judge criteria와 few-shot 예시를 구성합니다.
+          {% endif %}
+        </p>
       </div>
       {% if not is_running %}
       <form method="post" action="{{ compare_url_base }}/step2/run">
@@ -205,7 +204,6 @@
     {% endif %}
   </div>
 
-  {% endif %}
 </div>
 
 {% if is_running %}

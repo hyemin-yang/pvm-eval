@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}pvm - A/B 비교 이력 · {{ info.id }}{% endblock %}
+{% block content %}
+<div class="p-8 max-w-5xl">
+
+  <div class="mb-6">
+    <a href="/prompts/{{ info.id }}"
+       class="text-sm text-gray-400 hover:text-gray-600">← {{ info.id }}</a>
+    <div class="flex items-center justify-between mt-2">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">A/B 비교 이력</h1>
+        <p class="text-sm text-gray-400 mt-1">
+          <span class="font-mono">{{ info.id }}</span>
+          <span class="mx-1.5">·</span>
+          {{ history | length }}건
+        </p>
+      </div>
+      <a href="/prompts/{{ info.id }}/compare"
+         class="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-400 transition flex items-center gap-2">
+        + 새 A/B 비교
+      </a>
+    </div>
+  </div>
+
+  {% if not history %}
+  <div class="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
+    <div class="text-4xl mb-3">⚖️</div>
+    <p class="text-sm">아직 A/B 비교 이력이 없습니다.</p>
+    <a href="/prompts/{{ info.id }}/compare"
+       class="mt-4 inline-block px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-400 transition">
+      첫 비교 실행하기 →
+    </a>
+  </div>
+
+  {% else %}
+
+  <div class="space-y-3">
+    {% for run in history %}
+    <div class="bg-white border border-gray-200 rounded-xl p-5 hover:border-orange-200 transition">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-2 flex-wrap">
+            <span class="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+              {{ run.compare_hash }}
+            </span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600">
+              pairwise
+            </span>
+            {% if run.partial %}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">부분 결과</span>
+            {% endif %}
+          </div>
+
+          <div class="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+            <span class="font-semibold text-blue-600">v{{ run.version_a }}</span>
+            <span class="text-gray-300">vs</span>
+            <span class="font-semibold text-red-500">v{{ run.version_b }}</span>
+          </div>
+
+          <div class="flex items-center gap-4 text-xs text-gray-400 flex-wrap mt-2">
+            <span>{{ run.created_at or '-' }}</span>
+            <span class="font-mono">{{ run.judge_provider }}/{{ run.judge_model }}</span>
+            {% if run.matched_traces %}
+            <span>{{ run.matched_traces }}건 비교</span>
+            {% endif %}
+            {% if run.criteria_source_run_hash %}
+            <span class="font-mono text-indigo-500" title="{{ run.criteria_source_run_hash }}">
+              criteria: v{{ run.criteria_source_version }} / {{ run.criteria_source_run_hash[:8] }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 flex-shrink-0">
+          {% if run.has_report %}
+          <div class="text-right">
+            <div class="text-lg font-bold font-mono text-blue-600">{{ run.a_rate }}%</div>
+            <div class="text-xs text-gray-400 mt-0.5">A 승률</div>
+            <div class="text-xs text-gray-400 font-mono mt-0.5">
+              A {{ run.a_wins }} · SAME {{ run.ties }} · B {{ run.b_wins }}
+            </div>
+          </div>
+          {% else %}
+          <div class="text-right text-gray-300">
+            <div class="text-2xl font-bold">—</div>
+            <div class="text-xs mt-0.5">미완료</div>
+          </div>
+          {% endif %}
+
+          <div class="flex flex-col gap-1.5">
+            {% if run.has_report %}
+            <a href="/prompts/{{ info.id }}/compare/{{ run.compare_hash }}/report"
+               class="px-3 py-1.5 bg-gray-800 text-white text-xs font-semibold rounded-lg hover:bg-gray-700 transition whitespace-nowrap">
+              리포트 →
+            </a>
+            {% endif %}
+            <a href="/prompts/{{ info.id }}/compare/{{ run.compare_hash }}/{{ 'step3' if run.has_report else 'step2' }}"
+               class="px-3 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap text-center
+                      {% if run.has_report %}bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100
+                      {% else %}bg-orange-500 text-white hover:bg-orange-400{% endif %}">
+              {% if run.has_report %}상세 보기{% else %}계속하기 →{% endif %}
+            </a>
+            <form method="post" action="/prompts/{{ info.id }}/compare/{{ run.compare_hash }}/delete"
+                  onsubmit="return confirm('이 A/B 비교 실행({{ run.compare_hash }})을 삭제합니다. 비교 결과와 메타가 모두 삭제됩니다. 계속하시겠습니까?')">
+              <button type="submit"
+                      class="w-full px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition whitespace-nowrap">
+                삭제
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -63,6 +63,14 @@
             {% if run.partial %}
             <span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">부분 결과</span>
             {% endif %}
+            {% if run.dataset_badge %}
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium
+              {% if run.dataset_badge.tone == 'green' %}bg-green-50 text-green-700
+              {% elif run.dataset_badge.tone == 'yellow' %}bg-yellow-50 text-yellow-700
+              {% else %}bg-gray-100 text-gray-500{% endif %}">
+              {{ run.dataset_badge.label }}
+            </span>
+            {% endif %}
           </div>
 
           <div class="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
@@ -75,6 +83,12 @@
             <span class="font-mono text-gray-400 truncate max-w-xs" title="{{ run.csv_filename }}">📄 {{ run.csv_filename }}</span>
             {% elif run.csv_hash %}
             <span class="font-mono text-gray-300" title="{{ run.csv_hash }}">📄 {{ run.csv_hash[:8] }}...</span>
+            {% endif %}
+            {% if run.dataset_name %}
+            <span class="font-mono text-gray-400 truncate max-w-xs" title="{{ run.dataset_name }}">dataset: {{ run.dataset_name }}</span>
+            {% endif %}
+            {% if run.query_count %}
+            <span>{{ run.query_count }} queries</span>
             {% endif %}
           </div>
 

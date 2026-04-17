@@ -32,6 +32,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from judge_composer import FewShotExample, JudgePromptComponents, JudgePromptComposer, save_components
+from step1_error_analysis import run as run_error_analysis
 
 RANDOM_SEED = 42
 SPLIT_RATIOS = {"train": 0.70, "dev": 0.15, "test": 0.15}
@@ -421,6 +422,17 @@ def build_few_shot_components_pairwise(examples: dict[str, dict | None]) -> list
     return result
 
 
+def _ensure_pairwise_error_analysis(
+    config_path: str,
+    error_analysis_path: Path,
+    judge_type: str,
+) -> None:
+    if error_analysis_path.exists() or judge_type != "pairwise":
+        return
+    print(f"[Step 2] {error_analysis_path.name} 없음 -> CSV critique/category 기반으로 criteria 분석을 먼저 생성합니다.")
+    run_error_analysis(config_path)
+
+
 def build_few_shot_components(examples: dict[str, dict | None], category_name: str) -> list[FewShotExample]:
     """few-shot 예시를 JudgePromptComponents용 객체로 변환한다."""
     result: list[FewShotExample] = []
@@ -477,6 +489,8 @@ def run(
         error_analysis_path = Path(error_analysis_path_override)
     else:
         error_analysis_path = output_dir / "error_analysis.json"
+
+    _ensure_pairwise_error_analysis(config_path, error_analysis_path, judge_type)
 
     if not error_analysis_path.exists():
         print(f"[오류] {error_analysis_path} 를 찾을 수 없습니다.")

@@ -66,9 +66,8 @@ def detect_columns_verbose(
         missing.append("trace_id")
 
     if judge_type == "pairwise":
-        # pairwise: winner 컬럼 필수, response_a + (response_b 또는 llm_output) 필요
-        if "winner" not in mapping:
-            missing.append("winner")
+        # pairwise: response_a + (response_b 또는 llm_output) 필요
+        # winner는 있으면 평가 정확도 계산에 사용하고, 없어도 judge 실행 자체는 가능하다.
         has_response_b = "response_b" in mapping or "llm_output" in mapping
         if "response_a" not in mapping:
             missing.append("response_a")

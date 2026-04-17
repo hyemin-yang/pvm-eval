@@ -24,6 +24,14 @@ from hashlib import sha256
 from pathlib import Path
 
 
+def _first_matching_column(columns: list[str], candidates: list[str]) -> str:
+    lowered = {col.lower(): col for col in columns}
+    for candidate in candidates:
+        if candidate in lowered:
+            return lowered[candidate]
+    return ""
+
+
 # ── 해시 계산 ────────────────────────────────────────────────────────────────
 
 def compute_csv_hash(csv_path: Path) -> str:
@@ -144,10 +152,32 @@ def register_csv(
     meta = {
         "csv_hash": csv_hash,
         "original_path": str((original_path or csv_path).resolve()),
+        "original_name": (original_path or csv_path).name,
+        "dataset_name": (original_path or csv_path).stem,
         "registered_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "row_count": len(df),
         "columns": list(df.columns),
+        "trace_id_column": _first_matching_column(
+            list(df.columns),
+            ["trace_id", "scenario_id", "id", "sample_id", "row_id", "index"],
+        ),
+        "query_column": _first_matching_column(
+            list(df.columns),
+            ["user_input", "prompt", "input_prompt", "conversation", "dialogue", "history"],
+        ),
+        "response_column": _first_matching_column(
+            list(df.columns),
+            ["llm_output", "response", "output", "assistant_response"],
+        ),
     }
+    query_col = meta["query_column"]
+    if query_col and query_col in df.columns:
+        try:
+            meta["query_count"] = int(df[query_col].fillna("").astype(str).str.strip().nunique())
+        except Exception:
+            meta["query_count"] = len(df)
+    else:
+        meta["query_count"] = len(df)
     (dataset_dir / "meta.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -272,6 +302,167 @@ def latest_judge_result(pvm_root: Path, prompt_id: str, version: str) -> dict | 
                 pvm_root, prompt_id, version, run["pipeline_hash"]
             )
     return None
+
+
+# ── Query Dataset 관리 ────────────────────────────────────────────────────────
+
+def query_datasets_dir(pvm_root: Path, prompt_id: str) -> Path:
+    """프롬프트별 query dataset 저장소 경로."""
+    return pvm_root / "prompts" / prompt_id / "query_datasets"
+
+
+def register_query_dataset(
+    pvm_root: Path,
+    prompt_id: str,
+    csv_path: Path,
+    name: str = "",
+) -> tuple[str, Path]:
+    """query dataset CSV를 등록하고 (dataset_id, data_path)를 반환한다."""
+    import pandas as pd
+
+    # 내용 기반 hash → 동일 파일 재업로드 시 중복 방지
+    h = sha256()
+    with open(csv_path, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    dataset_id = h.hexdigest()[:16]
+
+    dest_dir = query_datasets_dir(pvm_root, prompt_id) / dataset_id
+    data_path = dest_dir / "data.csv"
+
+    if not dest_dir.exists():
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(csv_path, data_path)
+
+    df = pd.read_csv(data_path)
+    columns = list(df.columns)
+    meta = {
+        "dataset_id": dataset_id,
+        "name": name or csv_path.name,
+        "original_name": csv_path.name,
+        "registered_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "row_count": len(df),
+        "columns": columns,
+        "trace_id_column": _first_matching_column(
+            columns, ["trace_id", "scenario_id", "id", "sample_id", "row_id"]
+        ),
+        "query_column": _first_matching_column(
+            columns, ["user_input", "prompt", "input_prompt", "conversation", "dialogue"]
+        ),
+    }
+    _write_json(dest_dir / "meta.json", meta)
+    return dataset_id, data_path
+
+
+def list_query_datasets(pvm_root: Path, prompt_id: str) -> list[dict]:
+    """프롬프트의 query dataset 목록을 최신 등록순으로 반환한다."""
+    base = query_datasets_dir(pvm_root, prompt_id)
+    if not base.exists():
+        return []
+    result = []
+    for d in base.iterdir():
+        if not d.is_dir():
+            continue
+        meta_path = d / "meta.json"
+        if not meta_path.exists():
+            continue
+        try:
+            result.append(json.loads(meta_path.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    result.sort(key=lambda m: m.get("registered_at", ""), reverse=True)
+    return result
+
+
+def get_query_dataset(pvm_root: Path, prompt_id: str, dataset_id: str) -> tuple[Path, dict] | None:
+    """(data_path, meta) 반환. 없으면 None."""
+    d = query_datasets_dir(pvm_root, prompt_id) / dataset_id
+    data_path = d / "data.csv"
+    meta_path = d / "meta.json"
+    if not data_path.exists() or not meta_path.exists():
+        return None
+    return data_path, json.loads(meta_path.read_text(encoding="utf-8"))
+
+
+def delete_query_dataset(pvm_root: Path, prompt_id: str, dataset_id: str) -> bool:
+    """query dataset 삭제. 성공 여부 반환."""
+    d = query_datasets_dir(pvm_root, prompt_id) / dataset_id
+    if d.exists():
+        shutil.rmtree(d)
+        return True
+    return False
+
+
+def join_query_and_response(
+    pvm_root: Path,
+    prompt_id: str,
+    dataset_id: str,
+    response_csv_path: Path,
+) -> tuple[Path, list[str]]:
+    """query dataset + response CSV를 trace_id 기준으로 join해 완성 CSV를 반환한다.
+
+    Returns:
+        (joined_csv_path, missing_trace_ids)
+        - joined_csv_path: 결합된 임시 CSV
+        - missing_trace_ids: response에만 있고 query에 없는 trace_id 목록
+    """
+    import csv as _csv
+    import tempfile
+
+    result = get_query_dataset(pvm_root, prompt_id, dataset_id)
+    if result is None:
+        raise FileNotFoundError(f"Query dataset {dataset_id} not found")
+    query_path, meta = result
+
+    tid_col = meta.get("trace_id_column") or "trace_id"
+
+    # query 로드 (trace_id → row)
+    queries: dict[str, dict] = {}
+    with open(query_path, encoding="utf-8-sig") as f:
+        for row in _csv.DictReader(f):
+            tid = (row.get(tid_col) or "").strip()
+            if tid:
+                queries[tid] = row
+
+    # response 로드
+    responses: list[dict] = []
+    resp_fieldnames: list[str] = []
+    with open(response_csv_path, encoding="utf-8-sig") as f:
+        reader = _csv.DictReader(f)
+        resp_fieldnames = list(reader.fieldnames or [])
+        for row in reader:
+            responses.append(row)
+
+    # trace_id 컬럼 탐색 (response 측)
+    resp_tid_col = _first_matching_column(
+        resp_fieldnames, ["trace_id", "scenario_id", "id", "sample_id"]
+    ) or tid_col
+
+    missing: list[str] = []
+    joined_rows: list[dict] = []
+    query_cols = list(next(iter(queries.values()), {}).keys()) if queries else []
+    all_cols_set: dict[str, None] = dict.fromkeys(query_cols)
+    all_cols_set.update(dict.fromkeys(resp_fieldnames))
+    all_fieldnames = list(all_cols_set)
+
+    for resp_row in responses:
+        tid = (resp_row.get(resp_tid_col) or "").strip()
+        if tid in queries:
+            merged = {**queries[tid], **resp_row}
+        else:
+            missing.append(tid)
+            merged = dict(resp_row)
+        joined_rows.append(merged)
+
+    # 임시 파일에 저장
+    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w",
+                                      encoding="utf-8", newline="")
+    writer = _csv.DictWriter(tmp, fieldnames=all_fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(joined_rows)
+    tmp.close()
+
+    return Path(tmp.name), missing
 
 
 # ── 내부 헬퍼 ─────────────────────────────────────────────────────────────────

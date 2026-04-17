@@ -131,16 +131,27 @@ def format_traces_for_analysis(df: pd.DataFrame, cols: dict, judge_type: str = "
 
     if judge_type == "pairwise":
         winner_col = cols.get("winner", "")
-        if not winner_col:
-            raise KeyError("pairwise judge_type에는 columns.winner가 필요합니다.")
+        category_col = cols.get("category", "")
 
         for _, row in df.iterrows():
             trace_id = row[trace_id_col]
-            winner = normalize_label(row[winner_col])
+            winner = (
+                normalize_label(row[winner_col])
+                if winner_col and winner_col in row.index
+                else ""
+            )
             human_reason = row.get(human_reason_col, "") if human_reason_col else ""
+            category = row.get(category_col, "") if category_col else ""
 
             tag_map = {"A": "[A 우세]", "B": "[B 우세]", "SAME": "[동점]"}
-            tag = tag_map.get(winner, f"[{winner}]")
+            if winner in tag_map:
+                tag = tag_map[winner]
+            elif category and pd.notna(category) and str(category).strip():
+                tag = f"[카테고리: {str(category).strip()}]"
+            elif human_reason and pd.notna(human_reason) and str(human_reason).strip():
+                tag = "[CRITIQUE]"
+            else:
+                tag = "[PAIRWISE]"
 
             content = build_pairwise_text(row, cols)
             entry = (
@@ -264,23 +275,48 @@ def run(config_path: str) -> None:
     raw_total_traces = len(df)
     print(f"[Step 1] 트레이스 {raw_total_traces}개 로드 완료 (judge_type: {judge_type})")
 
-    # 라벨 컬럼 결정 (pointwise: human_label, pairwise: winner)
     if judge_type == "pairwise":
-        label_col = cols.get("winner", "")
-        if not label_col:
-            raise KeyError("pairwise judge_type에는 columns.winner가 필요합니다.")
+        winner_col = cols.get("winner", "")
+        reason_col = cols.get("human_reason", "")
+        category_col = cols.get("category", "")
+
+        if winner_col and winner_col in df.columns:
+            normalized_labels = df[winner_col].map(normalize_label)
+            winner_mask = normalized_labels.isin(["A", "B", "SAME"])
+        else:
+            normalized_labels = pd.Series([""] * len(df), index=df.index)
+            winner_mask = pd.Series([False] * len(df), index=df.index)
+
+        reason_mask = pd.Series([False] * len(df), index=df.index)
+        if reason_col and reason_col in df.columns:
+            reason_mask = df[reason_col].fillna("").astype(str).str.strip().ne("")
+
+        category_mask = pd.Series([False] * len(df), index=df.index)
+        if category_col and category_col in df.columns:
+            category_mask = df[category_col].fillna("").astype(str).str.strip().ne("")
+
+        analyzable_mask = winner_mask | reason_mask | category_mask
+        excluded_count = int((~analyzable_mask).sum())
+        if excluded_count:
+            df = df.loc[analyzable_mask].copy()
+            normalized_labels = normalized_labels.loc[analyzable_mask]
+            print(f"[Step 1] pairwise 분석 불가 행 {excluded_count}개 제외 (winner/critique/category 모두 없음)")
+
+        total_traces = len(df)
+        if total_traces == 0:
+            raise ValueError("분석 가능한 트레이스가 없습니다. winner 또는 critique/category 값을 확인하세요.")
     else:
         label_col = cols["human_label"]
+        normalized_labels = df[label_col].map(normalize_label)
+        excluded_count = int(normalized_labels.eq("").sum())
+        if excluded_count:
+            df = df.loc[~normalized_labels.eq("")].copy()
+            normalized_labels = normalized_labels.loc[~normalized_labels.eq("")]
+            print(f"[Step 1] {label_col} 비어있는 행 {excluded_count}개 제외")
 
-    normalized_labels = df[label_col].map(normalize_label)
-    excluded_count = int(normalized_labels.eq("").sum())
-    if excluded_count:
-        df = df.loc[~normalized_labels.eq("")].copy()
-        print(f"[Step 1] {label_col} 비어있는 행 {excluded_count}개 제외")
-
-    total_traces = len(df)
-    if total_traces == 0:
-        raise ValueError(f"분석 가능한 트레이스가 없습니다. {label_col} 값을 확인하세요.")
+        total_traces = len(df)
+        if total_traces == 0:
+            raise ValueError(f"분석 가능한 트레이스가 없습니다. {label_col} 값을 확인하세요.")
 
     # 트레이스 포매팅
     traces_text = format_traces_for_analysis(df, cols, judge_type=judge_type)
@@ -289,7 +325,16 @@ def run(config_path: str) -> None:
     # pointwise: Fail 개수 / pairwise: A 또는 B (우열이 있는) 개수
     if judge_type == "pairwise":
         fail_count = int(normalized_labels.isin(["A", "B"]).sum())
-        print(f"[Step 1] A/B 우열 트레이스: {fail_count}개 / 동점: {int(normalized_labels.eq('SAME').sum())}개 / 전체: {total_traces}개")
+        critique_count = 0
+        if reason_col and reason_col in df.columns:
+            critique_count = int(df[reason_col].fillna("").astype(str).str.strip().ne("").sum())
+        print(
+            f"[Step 1] A/B 우열 트레이스: {fail_count}개 / "
+            f"동점: {int(normalized_labels.eq('SAME').sum())}개 / "
+            f"critique 포함: {critique_count}개 / 전체: {total_traces}개"
+        )
+        if fail_count == 0:
+            fail_count = total_traces
     else:
         fail_count = int(normalized_labels.eq("Fail").sum())
         print(f"[Step 1] Fail 트레이스: {fail_count}개 / 전체: {total_traces}개")

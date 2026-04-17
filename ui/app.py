@@ -415,6 +415,7 @@ def _get_eval_summary(project, prompt_id: str) -> dict[str, dict | None]:
         versions = project.list_prompt_versions(prompt_id)
     except Exception:
         return {}
+    benchmark_csv_hash = _prompt_benchmark_csv_hash(project, prompt_id)
 
     summary: dict[str, dict | None] = {}
     for ver in versions:
@@ -437,6 +438,9 @@ def _get_eval_summary(project, prompt_id: str) -> dict[str, dict | None]:
             results_path = run_dir / "judge_results.json"
             if results_path.exists():
                 try:
+                    meta_path = run_dir / "pipeline_meta.json"
+                    meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+                    csv_info = _resolve_run_csv_info(project, run_dir, meta) or {}
                     data = json.loads(results_path.read_text(encoding="utf-8"))
                     found = _augment_eval_metrics(
                         data.get("metrics"),
@@ -447,11 +451,93 @@ def _get_eval_summary(project, prompt_id: str) -> dict[str, dict | None]:
                         found["run_at"] = data.get("run_at", "")
                         found["partial"] = data.get("partial", False)
                         found["pipeline_hash"] = run_dir.name
+                        csv_hash = meta.get("csv_hash", "") or csv_info.get("csv_hash", "")
+                        dataset_meta = _load_dataset_meta(project, csv_hash)
+                        found["csv_hash"] = csv_hash
+                        found["dataset_name"] = _dataset_display_name(csv_hash, dataset_meta, csv_info.get("csv_filename", ""))
+                        found["dataset_badge"] = _dataset_usage_badge(csv_hash, benchmark_csv_hash)
                 except Exception:
                     pass
                 break
         summary[ver] = found
     return summary
+
+
+def _augment_compare_summary(compare_meta: dict | None, judge_data: dict | None) -> dict | None:
+    if not compare_meta:
+        return None
+
+    results = (judge_data or {}).get("results", [])
+    a_wins = sum(1 for r in results if r.get("judge_verdict") == "A")
+    b_wins = sum(1 for r in results if r.get("judge_verdict") == "B")
+    ties = sum(1 for r in results if r.get("judge_verdict") == "SAME")
+    errors = sum(1 for r in results if r.get("judge_verdict") == "PARSE_ERROR")
+    total = len(results)
+
+    return {
+        "compare_hash": compare_meta.get("compare_hash", ""),
+        "version_a": compare_meta.get("version_a", ""),
+        "version_b": compare_meta.get("version_b", ""),
+        "judge_provider": compare_meta.get("judge_provider", ""),
+        "judge_model": compare_meta.get("judge_model", ""),
+        "matched_traces": compare_meta.get("matched_traces", 0),
+        "created_at": _format_timestamp(compare_meta.get("created_at", "")),
+        "created_at_raw": compare_meta.get("created_at", ""),
+        "step1_skipped": compare_meta.get("step1_skipped", False),
+        "criteria_source_version": compare_meta.get("criteria_source_version", ""),
+        "criteria_source_run_hash": compare_meta.get("criteria_source_run_hash", ""),
+        "result_count": total,
+        "a_wins": a_wins,
+        "b_wins": b_wins,
+        "ties": ties,
+        "errors": errors,
+        "a_rate": round(a_wins / total * 100, 1) if total else 0.0,
+        "b_rate": round(b_wins / total * 100, 1) if total else 0.0,
+        "tie_rate": round(ties / total * 100, 1) if total else 0.0,
+        "has_report": bool(judge_data and (judge_data.get("results") or judge_data.get("metrics"))),
+        "partial": bool((judge_data or {}).get("partial", False)),
+    }
+
+
+def _get_compare_history(project, prompt_id: str) -> list[dict]:
+    import json as _j
+
+    compare_root = _pvm_dir(project) / "prompts" / prompt_id / "compare"
+    if not compare_root.exists():
+        return []
+
+    history: list[dict] = []
+    for compare_dir in sorted(compare_root.iterdir(), reverse=True):
+        if not compare_dir.is_dir():
+            continue
+        meta_path = compare_dir / "compare_meta.json"
+        if not meta_path.exists():
+            continue
+        try:
+            meta = _j.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        judge_data = None
+        results_path = compare_dir / "judge_results.json"
+        if results_path.exists():
+            try:
+                judge_data = _j.loads(results_path.read_text(encoding="utf-8"))
+            except Exception:
+                judge_data = None
+
+        summary = _augment_compare_summary(meta, judge_data)
+        if summary is None:
+            continue
+        history.append(summary)
+
+    history.sort(key=lambda item: item.get("created_at_raw", ""), reverse=True)
+    return history
+
+
+def _get_latest_compare_summary(project, prompt_id: str) -> dict | None:
+    history = _get_compare_history(project, prompt_id)
+    return history[0] if history else None
 
 
 @app.get("/prompts/{prompt_id}", response_class=HTMLResponse)
@@ -467,6 +553,7 @@ def prompt_detail(request: Request, prompt_id: str):
         prompt_data = project.get_prompt(prompt_id, version=current_version)
 
     eval_summary = _get_eval_summary(project, prompt_id)
+    compare_summary = _get_latest_compare_summary(project, prompt_id)
     return _render(request, "prompt_detail.html",
         info=info,
         versions=versions,
@@ -475,6 +562,7 @@ def prompt_detail(request: Request, prompt_id: str):
         eval_ui_url=_eval_ui_url(project),
         pvm_root=str(project.root),
         eval_summary=eval_summary,
+        compare_summary=compare_summary,
     )
 
 
@@ -486,6 +574,7 @@ def prompt_version_detail(request: Request, prompt_id: str, version: str):
     prompt_data = project.get_prompt(prompt_id, version=version)
 
     eval_summary = _get_eval_summary(project, prompt_id)
+    compare_summary = _get_latest_compare_summary(project, prompt_id)
     return _render(request, "prompt_detail.html",
         info=info,
         versions=versions,
@@ -494,6 +583,7 @@ def prompt_version_detail(request: Request, prompt_id: str, version: str):
         eval_ui_url=_eval_ui_url(project),
         pvm_root=str(project.root),
         eval_summary=eval_summary,
+        compare_summary=compare_summary,
     )
 
 
@@ -688,6 +778,17 @@ def eval_run_delete(prompt_id: str, version: str, pipeline_hash: str):
     )
 
 
+@app.post("/prompts/{prompt_id}/compare/{compare_hash}/delete")
+def compare_run_delete(prompt_id: str, compare_hash: str):
+    import shutil as _shutil
+
+    project = get_project()
+    compare_dir = _compare_run_dir(project, prompt_id, compare_hash)
+    if compare_dir.exists():
+        _shutil.rmtree(compare_dir)
+    return RedirectResponse(f"/prompts/{prompt_id}/compare/history", status_code=303)
+
+
 @app.post("/prompts/{prompt_id}/edit-info")
 def prompt_edit_info(
     prompt_id: str,
@@ -840,12 +941,155 @@ def _resolve_run_csv_info(project, run_dir: Path, meta: dict | None = None) -> d
     return None
 
 
-def _eval_reusable_csvs(project, prompt_id: str) -> list[dict]:
+def _load_dataset_meta(project, csv_hash: str) -> dict:
+    if not csv_hash:
+        return {}
+    meta_path = _pvm_dir(project) / "datasets" / csv_hash / "meta.json"
+    if not meta_path.exists():
+        return {}
+    try:
+        return _json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _dataset_display_name(csv_hash: str, meta: dict | None = None, fallback: str = "") -> str:
+    meta = meta or {}
+    return (
+        meta.get("dataset_name")
+        or meta.get("original_name")
+        or fallback
+        or (f"dataset:{csv_hash[:8]}" if csv_hash else "legacy dataset")
+    )
+
+
+def _dataset_usage_badge(csv_hash: str, benchmark_csv_hash: str) -> dict:
+    if not csv_hash:
+        return {
+            "code": "legacy",
+            "label": "dataset 정보 없음",
+            "tone": "gray",
+            "comparable": False,
+        }
+    if not benchmark_csv_hash:
+        return {
+            "code": "unknown",
+            "label": "비교 기준 없음",
+            "tone": "gray",
+            "comparable": False,
+        }
+    if csv_hash == benchmark_csv_hash:
+        return {
+            "code": "same",
+            "label": "동일 dataset",
+            "tone": "green",
+            "comparable": True,
+        }
+    return {
+        "code": "mismatch",
+        "label": "dataset 다름",
+        "tone": "yellow",
+        "comparable": False,
+    }
+
+
+def _iter_prompt_eval_runs(project, prompt_id: str) -> list[dict]:
+    runs: list[dict] = []
+    try:
+        versions = project.list_prompt_versions(prompt_id)
+    except Exception:
+        return runs
+
+    for ver in versions:
+        judge_dir = _pvm_dir(project) / "prompts" / prompt_id / "versions" / ver / "judge"
+        if not judge_dir.exists():
+            continue
+        for run_dir in judge_dir.iterdir():
+            if not run_dir.is_dir():
+                continue
+            meta_path = run_dir / "pipeline_meta.json"
+            meta: dict = {}
+            if meta_path.exists():
+                try:
+                    meta = _json.loads(meta_path.read_text(encoding="utf-8"))
+                except Exception:
+                    meta = {}
+            csv_info = _resolve_run_csv_info(project, run_dir, meta)
+            judge_data = None
+            results_path = run_dir / "judge_results.json"
+            if results_path.exists():
+                try:
+                    judge_data = _json.loads(results_path.read_text(encoding="utf-8"))
+                except Exception:
+                    judge_data = None
+            runs.append({
+                "version": ver,
+                "run_dir": run_dir,
+                "meta": meta,
+                "csv_info": csv_info,
+                "judge_data": judge_data,
+                "created_at_raw": meta.get("created_at", ""),
+            })
+
+    runs.sort(key=lambda item: item.get("created_at_raw", ""), reverse=True)
+    return runs
+
+
+def _prompt_benchmark_csv_hash(project, prompt_id: str) -> str:
+    for item in _iter_prompt_eval_runs(project, prompt_id):
+        if not item.get("judge_data"):
+            continue
+        csv_info = item.get("csv_info") or {}
+        csv_hash = csv_info.get("csv_hash", "")
+        if csv_hash:
+            return csv_hash
+    return ""
+
+
+def _recommended_dataset_for_version(project, prompt_id: str, version: str) -> dict | None:
+    try:
+        versions = project.list_prompt_versions(prompt_id)
+    except Exception:
+        return None
+
+    previous_versions: set[str] = set()
+    if version in versions:
+        previous_versions = set(versions[:versions.index(version)])
+
+    for item in _iter_prompt_eval_runs(project, prompt_id):
+        if item["version"] not in previous_versions:
+            continue
+        if not item.get("judge_data"):
+            continue
+        csv_info = item.get("csv_info") or {}
+        csv_hash = csv_info.get("csv_hash", "")
+        if not csv_hash:
+            continue
+        dataset_meta = _load_dataset_meta(project, csv_hash)
+        return {
+            "csv_hash": csv_hash,
+            "version": item["version"],
+            "pipeline_hash": item["run_dir"].name,
+            "created_at": _format_timestamp(item["created_at_raw"]),
+            "dataset_name": _dataset_display_name(csv_hash, dataset_meta, csv_info.get("csv_filename", "")),
+            "row_count": dataset_meta.get("row_count"),
+            "query_count": dataset_meta.get("query_count"),
+            "csv_filename": csv_info.get("csv_filename", ""),
+        }
+    return None
+
+
+def _eval_reusable_csvs(project, prompt_id: str, target_version: str | None = None) -> list[dict]:
     """Return unique reusable CSVs seen in prior eval runs for a prompt."""
     import json as _j
 
     items: list[dict] = []
     seen: set[tuple[str, str]] = set()
+    recommended = (
+        _recommended_dataset_for_version(project, prompt_id, version=target_version)
+        if target_version
+        else None
+    )
     try:
         versions = project.list_prompt_versions(prompt_id)
     except Exception:
@@ -872,15 +1116,21 @@ def _eval_reusable_csvs(project, prompt_id: str) -> list[dict]:
             if dedupe_key in seen:
                 continue
             seen.add(dedupe_key)
+            csv_hash = csv_info.get("csv_hash", "")
+            dataset_meta = _load_dataset_meta(project, csv_hash)
             items.append({
                 "version": ver,
                 "hash": run_dir.name,
                 "created_at": _format_timestamp(meta.get("created_at", "")),
                 "judge_model": meta.get("judge_model", "-"),
                 "judge_provider": meta.get("judge_provider", "-"),
-                "csv_hash": csv_info.get("csv_hash", ""),
+                "csv_hash": csv_hash,
                 "csv_filename": csv_info.get("csv_filename", csv_info["csv_path"].name),
                 "csv_path": str(csv_info["csv_path"]),
+                "dataset_name": _dataset_display_name(csv_hash, dataset_meta, csv_info.get("csv_filename", "")),
+                "row_count": dataset_meta.get("row_count"),
+                "query_count": dataset_meta.get("query_count"),
+                "recommended": bool(recommended and recommended.get("csv_hash") == csv_hash),
             })
     return items
 
@@ -890,6 +1140,7 @@ def _get_eval_history(project, prompt_id: str, version: str) -> list:
     judge_dir = project.root / ".pvm" / "prompts" / prompt_id / "versions" / version / "judge"
     if not judge_dir.exists():
         return []
+    benchmark_csv_hash = _prompt_benchmark_csv_hash(project, prompt_id)
     history = []
     def _meta_created_at(p: Path) -> str:
         mp = p / "pipeline_meta.json"
@@ -918,16 +1169,10 @@ def _get_eval_history(project, prompt_id: str, version: str) -> list:
                 pass
         step_status = get_run_status(run_dir)
         created_at_raw = meta.get("created_at", "")
-        csv_hash = meta.get("csv_hash", "")
-        # CSV 원본 파일명 조회
-        csv_filename = ""
-        if csv_hash:
-            csv_meta = _pvm_dir(project) / "datasets" / csv_hash / "meta.json"
-            if csv_meta.exists():
-                try:
-                    csv_filename = _j.loads(csv_meta.read_text(encoding="utf-8")).get("original_name", "")
-                except Exception:
-                    pass
+        csv_info = _resolve_run_csv_info(project, run_dir, meta) or {}
+        csv_hash = meta.get("csv_hash", "") or csv_info.get("csv_hash", "")
+        dataset_meta = _load_dataset_meta(project, csv_hash)
+        csv_filename = dataset_meta.get("original_name", "") or csv_info.get("csv_filename", "")
         history.append({
             "pipeline_hash": run_dir.name,
             "created_at": _format_timestamp(created_at_raw),
@@ -936,6 +1181,10 @@ def _get_eval_history(project, prompt_id: str, version: str) -> list:
             "judge_provider": meta.get("judge_provider", "-"),
             "csv_hash": csv_hash,
             "csv_filename": csv_filename,
+            "dataset_name": _dataset_display_name(csv_hash, dataset_meta, csv_info.get("csv_filename", csv_filename)),
+            "dataset_badge": _dataset_usage_badge(csv_hash, benchmark_csv_hash),
+            "row_count": dataset_meta.get("row_count"),
+            "query_count": dataset_meta.get("query_count"),
             "step_status": step_status,
             "metrics": _augment_eval_metrics(
                 judge_data.get("metrics") if judge_data else None,
@@ -1019,7 +1268,64 @@ def eval_api_reusable_runs(prompt_id: str, version: str):
 @app.get("/prompts/{prompt_id}/version/{version}/eval/api/reusable-csvs")
 def eval_api_reusable_csvs(prompt_id: str, version: str):
     project = get_project()
-    return JSONResponse(_eval_reusable_csvs(project, prompt_id))
+    return JSONResponse(_eval_reusable_csvs(project, prompt_id, target_version=version))
+
+
+# ── Query Dataset 관리 ────────────────────────────────────────────────────────
+
+@app.get("/prompts/{prompt_id}/datasets", response_class=HTMLResponse)
+def prompt_datasets_page(request: Request, prompt_id: str):
+    from pvm.eval_pipeline.pvm_storage import list_query_datasets
+    project = get_project()
+    info = project.get_prompt_info(prompt_id)
+    datasets = list_query_datasets(_pvm_dir(project), prompt_id)
+    for ds in datasets:
+        ds["registered_at_fmt"] = _format_timestamp(ds.get("registered_at", ""))
+    return _render(request, "prompt_datasets.html",
+        info=info,
+        datasets=datasets,
+    )
+
+
+@app.post("/prompts/{prompt_id}/datasets/upload")
+async def prompt_datasets_upload(
+    prompt_id: str,
+    csv_file: UploadFile = File(...),
+    name: str = Form(""),
+):
+    import tempfile
+    from pvm.eval_pipeline.pvm_storage import register_query_dataset
+    project = get_project()
+    content = await csv_file.read()
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+    try:
+        register_query_dataset(
+            _pvm_dir(project), prompt_id, tmp_path,
+            name=name or csv_file.filename or "",
+        )
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    return RedirectResponse(f"/prompts/{prompt_id}/datasets", status_code=303)
+
+
+@app.post("/prompts/{prompt_id}/datasets/{dataset_id}/delete")
+def prompt_datasets_delete(prompt_id: str, dataset_id: str):
+    from pvm.eval_pipeline.pvm_storage import delete_query_dataset
+    project = get_project()
+    delete_query_dataset(_pvm_dir(project), prompt_id, dataset_id)
+    return RedirectResponse(f"/prompts/{prompt_id}/datasets", status_code=303)
+
+
+@app.get("/prompts/{prompt_id}/datasets/api/list")
+def prompt_datasets_api_list(prompt_id: str):
+    from pvm.eval_pipeline.pvm_storage import list_query_datasets
+    project = get_project()
+    datasets = list_query_datasets(_pvm_dir(project), prompt_id)
+    for ds in datasets:
+        ds["registered_at_fmt"] = _format_timestamp(ds.get("registered_at", ""))
+    return JSONResponse(datasets)
 
 
 @app.get("/prompts/{prompt_id}/version/{version}/eval/new", response_class=HTMLResponse)
@@ -1027,11 +1333,13 @@ def eval_new_form(request: Request, prompt_id: str, version: str):
     project = get_project()
     info = project.get_prompt_info(prompt_id)
     prompt_data = project.get_prompt(prompt_id, version=version)
+    recommended_dataset = _recommended_dataset_for_version(project, prompt_id, version)
     return _render(request, "eval_start.html",
         info=info,
         version=version,
         prompt_data=prompt_data,
         eval_configured=is_configured(),
+        recommended_dataset=recommended_dataset,
     )
 
 
@@ -1041,6 +1349,8 @@ async def eval_start(
     prompt_id: str,
     version: str,
     csv_file: UploadFile | None = File(None),
+    response_file: UploadFile | None = File(None),
+    query_dataset_id: str = Form(""),
     provider: str = Form("openai"),
     model: str = Form("gpt-4.1"),
     judge_type: str = Form("pointwise"),
@@ -1049,17 +1359,68 @@ async def eval_start(
     reuse_csv_hash: str = Form(""),
 ):
     project = get_project()
+    recommended_dataset = _recommended_dataset_for_version(project, prompt_id, version)
 
     from pvm.eval_pipeline.pvm_storage import create_pipeline_run, register_csv
     prompt_data = project.get_prompt(prompt_id, version=version)
     system_prompt = prompt_data.get("prompt", "")
     pvm_dir = _pvm_dir(project)
 
-    # CSV 결정: 새 업로드 또는 기존 등록 CSV 재사용
+    # CSV 결정: (1) query+response join 모드 / (2) 기존 재사용 / (3) 전체 CSV 업로드
     import json as _json2
+    import tempfile as _tempfile
     registered_csv: Path | None = None
     csv_hash = ""
-    if reuse_csv_hash:
+
+    def _eval_error(msg: str):
+        return _render(
+            request, "eval_start.html",
+            info=project.get_prompt_info(prompt_id),
+            version=version,
+            prompt_data=project.get_prompt(prompt_id, version=version),
+            eval_configured=is_configured(),
+            recommended_dataset=recommended_dataset,
+            error=msg,
+        )
+
+    # (1) query dataset + response CSV join 모드
+    if query_dataset_id:
+        from pvm.eval_pipeline.pvm_storage import join_query_and_response, register_csv as _reg_csv
+        if response_file is None or not response_file.filename:
+            return _eval_error("Response CSV를 업로드해주세요.")
+        resp_content = await response_file.read()
+        with _tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+            tmp.write(resp_content)
+            resp_tmp = Path(tmp.name)
+        try:
+            joined_path, missing = join_query_and_response(
+                pvm_dir, prompt_id, query_dataset_id, resp_tmp
+            )
+        except FileNotFoundError:
+            resp_tmp.unlink(missing_ok=True)
+            return _eval_error("선택한 Query Dataset을 찾을 수 없습니다.")
+        finally:
+            resp_tmp.unlink(missing_ok=True)
+
+        if missing:
+            joined_path.unlink(missing_ok=True)
+            return _eval_error(
+                f"Response CSV에 Query Dataset에 없는 trace_id가 {len(missing)}개 있습니다: "
+                + ", ".join(missing[:5]) + ("..." if len(missing) > 5 else "")
+            )
+        csv_hash, registered_csv = _reg_csv(pvm_dir, joined_path,
+                                             original_path=Path(response_file.filename))
+        joined_path.unlink(missing_ok=True)
+        # 업로드된 response 파일명으로 meta 갱신
+        if response_file.filename:
+            _mp = pvm_dir / "datasets" / csv_hash / "meta.json"
+            if _mp.exists():
+                _m = _json2.loads(_mp.read_text(encoding="utf-8"))
+                _m["original_name"] = response_file.filename
+                _m["query_dataset_id"] = query_dataset_id
+                _mp.write_text(_json2.dumps(_m, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    elif reuse_csv_hash:
         candidate = pvm_dir / "datasets" / reuse_csv_hash / "data.csv"
         if not candidate.exists():
             return _render(
@@ -1069,6 +1430,7 @@ async def eval_start(
                 version=version,
                 prompt_data=prompt_data,
                 eval_configured=is_configured(),
+                recommended_dataset=recommended_dataset,
                 error="선택한 기존 CSV를 찾을 수 없습니다. 다시 선택해주세요.",
             )
         csv_hash = reuse_csv_hash
@@ -1082,6 +1444,7 @@ async def eval_start(
                 version=version,
                 prompt_data=prompt_data,
                 eval_configured=is_configured(),
+                recommended_dataset=recommended_dataset,
                 error="새 CSV를 업로드하거나 기존 CSV를 선택해주세요.",
             )
 
@@ -1132,6 +1495,7 @@ async def eval_start(
             version=version,
             prompt_data=prompt_data,
             eval_configured=is_configured(),
+            recommended_dataset=recommended_dataset,
             error=result["output"],
         )
 
@@ -1717,10 +2081,24 @@ def compare_setup(request: Request, prompt_id: str):
     return _render(request, "compare_setup.html", info=info, versions=versions)
 
 
+@app.get("/prompts/{prompt_id}/compare/history", response_class=HTMLResponse)
+def compare_history(request: Request, prompt_id: str):
+    project = get_project()
+    info = project.get_prompt_info(prompt_id)
+    history = _get_compare_history(project, prompt_id)
+    return _render(request, "compare_history.html", info=info, history=history)
+
+
 @app.get("/prompts/{prompt_id}/compare/api/runs/{version}")
 def compare_api_runs(prompt_id: str, version: str):
     project = get_project()
     return JSONResponse(_compare_available_runs(project, prompt_id, version))
+
+
+@app.get("/prompts/{prompt_id}/compare/api/reusable-runs")
+def compare_api_reusable_runs(prompt_id: str):
+    project = get_project()
+    return JSONResponse(_eval_runs_with_criteria(project, prompt_id))
 
 
 @app.get("/prompts/{prompt_id}/compare/api/join-preview")
@@ -1764,6 +2142,7 @@ def compare_api_join_preview(
 @app.post("/prompts/{prompt_id}/compare/start")
 async def compare_start(request: Request, prompt_id: str):
     import hashlib
+    import shutil as _shutil
     from datetime import timezone as _tz3
 
     project = get_project()
@@ -1779,6 +2158,8 @@ async def compare_start(request: Request, prompt_id: str):
     run_b_hash = str(form.get("run_b_hash", ""))
     join_key_a = str(form.get("join_key_a", "")).strip()
     join_key_b = str(form.get("join_key_b", "")).strip()
+    reuse_run_hash = str(form.get("reuse_run_hash", "")).strip()
+    reuse_from_version = str(form.get("reuse_from_version", "")).strip()
     provider = form.get("provider", "openai")
     model = form.get("model", "gpt-4.1")
 
@@ -1793,7 +2174,7 @@ async def compare_start(request: Request, prompt_id: str):
         return _err("버전 A와 버전 B를 모두 선택해주세요.")
 
     compare_hash = hashlib.sha256(
-        f"{version_a}:{run_a_hash}:{version_b}:{run_b_hash}:{provider}:{model}".encode()
+        f"{mode}:{version_a}:{run_a_hash}:{version_b}:{run_b_hash}:{provider}:{model}:{reuse_from_version}:{reuse_run_hash}".encode()
     ).hexdigest()[:12]
     compare_dir = _compare_run_dir(project, prompt_id, compare_hash)
 
@@ -1845,6 +2226,15 @@ async def compare_start(request: Request, prompt_id: str):
         "pvm_root": str(project.root),
     })
 
+    if reuse_run_hash and reuse_from_version:
+        src_run = (
+            project.root / ".pvm" / "prompts" / prompt_id
+            / "versions" / reuse_from_version / "judge" / reuse_run_hash
+        )
+        src_analysis = src_run / "error_analysis.json"
+        if src_analysis.exists():
+            _shutil.copy2(src_analysis, compare_dir / "error_analysis.json")
+
     compare_meta = {
         "compare_hash": compare_hash,
         "prompt_id": prompt_id,
@@ -1859,6 +2249,9 @@ async def compare_start(request: Request, prompt_id: str):
         "only_b": stats["only_b"],
         "join_key_a": stats.get("join_key_a", join_key_a),
         "join_key_b": stats.get("join_key_b", join_key_b),
+        "step1_skipped": True,
+        "criteria_source_version": reuse_from_version,
+        "criteria_source_run_hash": reuse_run_hash,
         "created_at": datetime.now(_tz3.utc).isoformat(),
     }
     (compare_dir / "compare_meta.json").write_text(
@@ -1866,7 +2259,7 @@ async def compare_start(request: Request, prompt_id: str):
     )
 
     return RedirectResponse(
-        f"/prompts/{prompt_id}/compare/{compare_hash}/step1", status_code=303
+        f"/prompts/{prompt_id}/compare/{compare_hash}/step2", status_code=303
     )
 
 
@@ -2009,6 +2402,7 @@ def compare_step3_stop(prompt_id: str, compare_hash: str):
 
 @app.get("/prompts/{prompt_id}/compare/{compare_hash}/report", response_class=HTMLResponse)
 def compare_report(request: Request, prompt_id: str, compare_hash: str):
+    import csv as _csv2
     project = get_project()
     ctx = _compare_ctx(project, prompt_id, compare_hash)
     run_dir = ctx["compare_dir"]
@@ -2021,7 +2415,26 @@ def compare_report(request: Request, prompt_id: str, compare_hash: str):
     ties   = sum(1 for r in results if r.get("judge_verdict") == "SAME")
     errors = sum(1 for r in results if r.get("judge_verdict") == "PARSE_ERROR")
     total  = len(results)
+
+    # combined.csv에서 query / response_a / response_b 인덱스 구축
+    trace_content: dict = {}
+    combined_csv = run_dir / "combined.csv"
+    if combined_csv.exists():
+        try:
+            with open(combined_csv, encoding="utf-8-sig") as f:
+                for row in _csv2.DictReader(f):
+                    tid = (row.get("trace_id") or "").strip()
+                    if tid:
+                        trace_content[tid] = {
+                            "user_input":  row.get("user_input", "") or row.get("conversation", ""),
+                            "response_a":  row.get("response_a", ""),
+                            "response_b":  row.get("llm_output", "") or row.get("response_b", ""),
+                        }
+        except Exception:
+            pass
+
     ctx["judge_data"] = judge_data
+    ctx["trace_content"] = trace_content
     ctx["summary"] = {
         "a_wins": a_wins, "b_wins": b_wins, "ties": ties, "errors": errors, "total": total,
         "a_rate": round(a_wins / total * 100, 1) if total else 0,

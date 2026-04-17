@@ -60,6 +60,16 @@
          class="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm">+ 새 버전</a>
       <!-- 구분선 -->
       <div class="w-px h-6 bg-gray-200"></div>
+      <!-- 데이터셋 -->
+      <a href="/prompts/{{ info.id }}/datasets"
+         class="px-3 py-1.5 text-sm font-semibold bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 shadow-sm flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16M9 11h6"/>
+        </svg>
+        데이터셋
+      </a>
+      <!-- 구분선 -->
+      <div class="w-px h-6 bg-gray-200"></div>
       <!-- 라벨링 -->
       {% if prompt_data %}
       <a href="/prompts/{{ info.id }}/version/{{ current_version }}/review"
@@ -223,6 +233,14 @@
                   <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">
                     {{ "%.0f"|format(pr) }}%
                   </span>
+                  {% if eval.get('dataset_badge') %}
+                  <span class="px-1.5 py-0.5 rounded text-xs font-medium
+                    {% if eval.dataset_badge.tone == 'green' %}bg-green-50 text-green-700
+                    {% elif eval.dataset_badge.tone == 'yellow' %}bg-yellow-50 text-yellow-700
+                    {% else %}bg-gray-100 text-gray-500{% endif %}">
+                    {{ eval.dataset_badge.label }}
+                  </span>
+                  {% endif %}
                 {% endif %}
                 {% if ver == info.latest_version %}
                   <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">최신</span>
@@ -297,6 +315,20 @@
             </span>
             {% endif %}
           </div>
+          {% if current_eval.get('dataset_name') %}
+          <div class="pt-1 text-xs text-gray-400">
+            dataset:
+            <span class="font-mono text-gray-500">{{ current_eval.dataset_name }}</span>
+            {% if current_eval.get('dataset_badge') %}
+            <span class="ml-1 px-1.5 py-0.5 rounded
+              {% if current_eval.dataset_badge.tone == 'green' %}bg-green-50 text-green-700
+              {% elif current_eval.dataset_badge.tone == 'yellow' %}bg-yellow-50 text-yellow-700
+              {% else %}bg-gray-100 text-gray-500{% endif %}">
+              {{ current_eval.dataset_badge.label }}
+            </span>
+            {% endif %}
+          </div>
+          {% endif %}
           {% if current_eval.pipeline_hash %}
           <a href="/prompts/{{ info.id }}/version/{{ current_version }}/eval/{{ current_eval.pipeline_hash }}/report"
              class="block text-center text-xs text-purple-600 hover:text-purple-800 pt-1">
@@ -320,6 +352,71 @@
         <a href="/prompts/{{ info.id }}/version/{{ current_version }}/eval/history"
            class="mt-1 block w-full text-center text-xs text-gray-400 hover:text-gray-600">
           평가 이력 보기 →
+        </a>
+      </div>
+      {% endif %}
+
+      {% if compare_summary %}
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-3">A/B 비교 결과</h2>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-400">최근 비교</span>
+            <span class="text-xs font-mono text-gray-400">{{ compare_summary.compare_hash[:8] }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="font-semibold text-blue-600">v{{ compare_summary.version_a }}</span>
+            <span class="text-gray-300">vs</span>
+            <span class="font-semibold text-red-500">v{{ compare_summary.version_b }}</span>
+          </div>
+          {% if compare_summary.has_report %}
+          <div class="grid grid-cols-3 gap-2 pt-1">
+            <div class="bg-blue-50 rounded p-1.5 text-center">
+              <div class="text-xs font-mono font-semibold text-blue-700">{{ compare_summary.a_rate }}%</div>
+              <div class="text-xs text-blue-500">A 승</div>
+            </div>
+            <div class="bg-gray-50 rounded p-1.5 text-center">
+              <div class="text-xs font-mono font-semibold text-gray-700">{{ compare_summary.tie_rate }}%</div>
+              <div class="text-xs text-gray-400">SAME</div>
+            </div>
+            <div class="bg-red-50 rounded p-1.5 text-center">
+              <div class="text-xs font-mono font-semibold text-red-700">{{ compare_summary.b_rate }}%</div>
+              <div class="text-xs text-red-500">B 승</div>
+            </div>
+          </div>
+          {% else %}
+          <p class="text-xs text-gray-400">아직 Judge 실행이 완료되지 않았습니다.</p>
+          {% endif %}
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs text-gray-400">
+              {{ compare_summary.result_count or compare_summary.matched_traces }}건
+              {% if compare_summary.partial %}<span class="text-orange-500">(부분)</span>{% endif %}
+            </span>
+            <span class="text-xs text-gray-400 font-mono">
+              {{ compare_summary.created_at[:10] if compare_summary.created_at else '-' }}
+            </span>
+          </div>
+          <a href="/prompts/{{ info.id }}/compare/{{ compare_summary.compare_hash }}/{{ 'report' if compare_summary.has_report else 'step2' }}"
+             class="block text-center text-xs text-orange-600 hover:text-orange-800 pt-1">
+            {% if compare_summary.has_report %}최근 비교 리포트 →{% else %}최근 비교 계속하기 →{% endif %}
+          </a>
+          <a href="/prompts/{{ info.id }}/compare/history"
+             class="block text-center text-xs text-gray-400 hover:text-gray-600 pt-1">
+            A/B 비교 이력 전체 보기 →
+          </a>
+        </div>
+      </div>
+      {% elif prompt_data %}
+      <div class="bg-white rounded-lg shadow p-4">
+        <h2 class="text-sm font-semibold text-gray-500 mb-2">A/B 비교 결과</h2>
+        <p class="text-xs text-gray-400">아직 A/B 비교 이력이 없습니다.</p>
+        <a href="/prompts/{{ info.id }}/compare"
+           class="mt-2 block w-full text-center text-xs text-orange-600 hover:text-orange-800 border border-orange-200 rounded py-1.5 hover:bg-orange-50 transition">
+          A/B 비교 시작 →
+        </a>
+        <a href="/prompts/{{ info.id }}/compare/history"
+           class="mt-1 block w-full text-center text-xs text-gray-400 hover:text-gray-600">
+          A/B 비교 이력 보기 →
         </a>
       </div>
       {% endif %}

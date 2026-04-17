@@ -208,6 +208,13 @@ def load_step2_yaml(run_dir: Path) -> dict | None:
 def get_run_status(run_dir: Path) -> dict:
     """어느 단계까지 완료됐는지 반환."""
     step1 = (run_dir / "error_analysis.json").exists()
+    meta_path = run_dir / "compare_meta.json"
+    if not step1 and meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            step1 = bool(meta.get("step1_skipped"))
+        except Exception:
+            pass
     step2 = select_judge_component_file(run_dir) is not None
     step3 = (run_dir / "judge_results.json").exists()
     return {"step1": step1, "step2": step2, "step3": step3}

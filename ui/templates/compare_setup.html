@@ -20,6 +20,8 @@
         enctype="multipart/form-data" id="compare-form">
     <input type="hidden" name="join_key_a" id="join-key-a" value="">
     <input type="hidden" name="join_key_b" id="join-key-b" value="">
+    <input type="hidden" name="reuse_run_hash" id="reuse-run-hash" value="">
+    <input type="hidden" name="reuse_from_version" id="reuse-from-version" value="">
 
     <!-- 모드 선택 -->
     <div class="bg-white border border-gray-200 rounded-xl p-6 mb-5">
@@ -159,6 +161,34 @@
       </div>
     </div>
 
+    <div class="bg-white border border-gray-200 rounded-xl p-6 mb-5">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-700">기존 Criteria 재사용</h2>
+          <p class="text-xs text-gray-400 mt-1">pairwise 비교에서는 별도 에러 분석을 건너뛰고, 이전 pointwise/pairwise 평가에서 만든 criteria를 재사용할 수 있습니다.</p>
+        </div>
+        <button type="button" id="reuse-toggle"
+                onclick="toggleReuse()"
+                class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-200 transition-colors focus:outline-none">
+          <span id="reuse-thumb"
+                class="inline-block h-3.5 w-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform"></span>
+        </button>
+      </div>
+
+      <div id="reuse-panel" class="hidden mt-3">
+        <div id="reuse-loading" class="text-xs text-gray-400">목록 불러오는 중...</div>
+        <div id="reuse-empty" class="hidden text-xs text-orange-500">
+          이 Prompt에 재사용 가능한 criteria가 없습니다.
+        </div>
+        <select id="reuse-select"
+                class="hidden w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                onchange="onReuseSelect(this)">
+          <option value="">-- 재사용할 criteria 선택 --</option>
+        </select>
+        <div id="reuse-preview" class="hidden mt-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-700 leading-relaxed"></div>
+      </div>
+    </div>
+
     <!-- Judge 설정 -->
     <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
       <h2 class="text-sm font-semibold text-gray-700 mb-4">Judge 모델</h2>
@@ -209,6 +239,8 @@ const MODEL_OPTIONS = {
     'gemini-2.5-pro', 'gemini-2.5-flash'
   ],
 };
+let _reuseOn = false;
+let _reuseRuns = [];
 
 function updateModels(provider) {
   const sel = document.getElementById('model-select');
@@ -225,6 +257,75 @@ function updateModels(provider) {
 function toggleMode(mode) {
   document.getElementById('mode-runs').classList.toggle('hidden', mode !== 'from_runs');
   document.getElementById('mode-csv').classList.toggle('hidden', mode !== 'upload_csv');
+}
+
+function toggleReuse() {
+  _reuseOn = !_reuseOn;
+  const toggle = document.getElementById('reuse-toggle');
+  const thumb = document.getElementById('reuse-thumb');
+  const panel = document.getElementById('reuse-panel');
+  toggle.classList.toggle('bg-indigo-500', _reuseOn);
+  toggle.classList.toggle('bg-gray-200', !_reuseOn);
+  thumb.classList.toggle('translate-x-4', _reuseOn);
+  thumb.classList.toggle('translate-x-0.5', !_reuseOn);
+  panel.classList.toggle('hidden', !_reuseOn);
+  if (_reuseOn && _reuseRuns.length === 0) loadReusableCriteria();
+  if (!_reuseOn) clearReuse();
+}
+
+function loadReusableCriteria() {
+  const loadingEl = document.getElementById('reuse-loading');
+  const emptyEl = document.getElementById('reuse-empty');
+  const selectEl = document.getElementById('reuse-select');
+  loadingEl.classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+  selectEl.classList.add('hidden');
+
+  fetch('/prompts/{{ info.id }}/compare/api/reusable-runs')
+    .then(r => r.json())
+    .then(runs => {
+      _reuseRuns = runs;
+      loadingEl.classList.add('hidden');
+      if (runs.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      selectEl.innerHTML = '<option value="">-- 재사용할 criteria 선택 --</option>';
+      runs.forEach((run, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `v${run.version}  |  ${run.created_at}  |  ${run.judge_provider}/${run.judge_model}  |  ${run.hash.slice(0, 8)}`;
+        selectEl.appendChild(opt);
+      });
+      selectEl.classList.remove('hidden');
+    })
+    .catch(() => {
+      loadingEl.classList.add('hidden');
+      emptyEl.classList.remove('hidden');
+    });
+}
+
+function onReuseSelect(sel) {
+  const previewEl = document.getElementById('reuse-preview');
+  if (!sel.value) {
+    clearReuse();
+    return;
+  }
+  const run = _reuseRuns[parseInt(sel.value, 10)];
+  document.getElementById('reuse-run-hash').value = run.hash;
+  document.getElementById('reuse-from-version').value = run.version;
+  if (run.criteria_preview) {
+    previewEl.textContent = run.criteria_preview;
+    previewEl.classList.remove('hidden');
+  } else {
+    previewEl.classList.add('hidden');
+  }
+}
+
+function clearReuse() {
+  document.getElementById('reuse-run-hash').value = '';
+  document.getElementById('reuse-from-version').value = '';
+  document.getElementById('reuse-preview').classList.add('hidden');
 }
 
 function selectedRunVersion(side) {
