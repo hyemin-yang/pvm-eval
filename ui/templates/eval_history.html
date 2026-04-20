@@ -116,27 +116,33 @@
           </div>
         </div>
 
-        <!-- 오른쪽: Pass Rate + 버튼 -->
+        <!-- 오른쪽: 지표 + 버튼 -->
         <div class="flex items-center gap-3 flex-shrink-0">
           {% if m %}
-          {% set judge_pass_cnt = m.get('pass_count', 0) %}
-          {% set judged_total = m.get('judged_total', 0) %}
-          {% set pr = (m.get('pass_rate', 0) * 100) if judged_total else 0 %}
+          {% set conf = m.get('confusion') or {} %}
+          {% set judge_pass_cnt = m.get('pass_count', (conf.get('tp', 0) + conf.get('fp', 0))) %}
+          {% set judged_total = m.get('judged_total', m.get('valid', 0)) %}
+          {% set pr = (judge_pass_cnt / judged_total * 100) if judged_total else 0 %}
+          {% set has_human_label = m.get('valid', 0) > 0 %}
           {% set acc = (m.get('accuracy') or 0) * 100 %}
+
+          <!-- 프롬프트 응답 성능 -->
           <div class="text-right">
-            <div class="text-2xl font-bold font-mono text-indigo-600">
-              {{ "%.1f"|format(pr) }}%
-            </div>
-            <div class="text-xs text-gray-400 mt-0.5">Pass Rate</div>
-            <div class="text-xs text-gray-400 font-mono mt-0.5">
-              {{ judge_pass_cnt }}/{{ judged_total if judged_total else '-' }}건
-              {% if m.get('valid', 0) > 0 %}
-              · 정확도 {{ "%.1f"|format(acc) }}%
-              {% else %}
-              · human label 없음
-              {% endif %}
-            </div>
+            <div class="text-xs text-gray-400 mb-0.5">프롬프트 응답 성능</div>
+            <div class="text-2xl font-bold font-mono text-indigo-600">{{ "%.1f"|format(pr) }}%</div>
+            <div class="text-xs text-gray-400 mt-0.5">Pass Rate · {{ judge_pass_cnt }}/{{ judged_total if judged_total else '-' }}건</div>
           </div>
+
+          <!-- Judge 정확도 (human label 있을 때만) -->
+          {% if has_human_label %}
+          <div class="w-px h-10 bg-gray-200"></div>
+          <div class="text-right">
+            <div class="text-xs text-gray-400 mb-0.5">Judge 정확도</div>
+            <div class="text-2xl font-bold font-mono text-gray-600">{{ "%.1f"|format(acc) }}%</div>
+            <div class="text-xs text-gray-400 mt-0.5">Accuracy</div>
+          </div>
+          {% endif %}
+
           {% else %}
           <div class="text-right text-gray-300">
             <div class="text-2xl font-bold">—</div>

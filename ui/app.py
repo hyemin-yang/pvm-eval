@@ -1357,6 +1357,7 @@ async def eval_start(
     reuse_run_hash: str = Form(""),
     reuse_from_version: str = Form(""),
     reuse_csv_hash: str = Form(""),
+    criteria_mode: str = Form("auto"),
 ):
     project = get_project()
     recommended_dataset = _recommended_dataset_for_version(project, prompt_id, version)
@@ -1508,6 +1509,30 @@ async def eval_start(
         "pvm_root": str(project.root),
     })
 
+    # criteria 직접 작성 모드: step1 skip, 빈 criteria 생성 후 step2로 이동
+    if criteria_mode == "manual" and not reuse_run_hash:
+        import yaml as _yaml2
+        stub = {"categories": [], "trace_labels": {}, "manual_mode": True}
+        (run_dir / "error_analysis.json").write_text(
+            _json2.dumps(stub, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        comp_dir = run_dir / "judge_components"
+        comp_dir.mkdir(parents=True, exist_ok=True)
+        blank = {"criteria": "", "few_shot": [], "judge_type": judge_type}
+        (comp_dir / "judge.yaml").write_text(
+            _yaml2.dump(blank, allow_unicode=True, default_flow_style=False, sort_keys=False),
+            encoding="utf-8",
+        )
+        meta_path2 = run_dir / "pipeline_meta.json"
+        if meta_path2.exists():
+            _m2 = _json2.loads(meta_path2.read_text(encoding="utf-8"))
+            _m2["criteria_mode"] = "manual"
+            meta_path2.write_text(_json2.dumps(_m2, ensure_ascii=False, indent=2), encoding="utf-8")
+        return RedirectResponse(
+            f"/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}/step2",
+            status_code=303,
+        )
+
     # criteria 재사용: 이전 run의 error_analysis.json + judge_components/ 복사
     if reuse_run_hash and reuse_from_version:
         import shutil as _shutil
@@ -1539,8 +1564,9 @@ def _eval_ctx(project, prompt_id: str, version: str, pipeline_hash: str) -> dict
     run_dir = _run_dir(project, prompt_id, version, pipeline_hash)
     step_status = get_run_status(run_dir)
 
-    # pipeline_meta.json에서 실행 시각 읽기
+    # pipeline_meta.json에서 실행 시각 + criteria_mode 읽기
     created_at = ""
+    criteria_mode = "auto"
     meta_path = run_dir / "pipeline_meta.json"
     if meta_path.exists():
         try:
@@ -1550,6 +1576,7 @@ def _eval_ctx(project, prompt_id: str, version: str, pipeline_hash: str) -> dict
                 from datetime import timezone as _tz
                 dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
                 created_at = dt.astimezone(_tz.utc).strftime("%Y-%m-%d %H:%M UTC")
+            criteria_mode = meta.get("criteria_mode", "auto")
         except Exception:
             pass
 
@@ -1560,6 +1587,7 @@ def _eval_ctx(project, prompt_id: str, version: str, pipeline_hash: str) -> dict
         "created_at": created_at,
         "run_dir": run_dir,
         "step_status": step_status,
+        "criteria_mode": criteria_mode,
         "eval_url_base": f"/prompts/{prompt_id}/version/{version}/eval/{pipeline_hash}",
     }
 
@@ -2069,6 +2097,7 @@ def _compare_ctx(project, prompt_id: str, compare_hash: str) -> dict:
         "created_at": created_at,
         "compare_dir": compare_dir,
         "step_status": step_status,
+        "criteria_mode": meta.get("criteria_mode", "auto"),
         "compare_url_base": f"/prompts/{prompt_id}/compare/{compare_hash}",
     }
 
@@ -2162,6 +2191,7 @@ async def compare_start(request: Request, prompt_id: str):
     reuse_from_version = str(form.get("reuse_from_version", "")).strip()
     provider = form.get("provider", "openai")
     model = form.get("model", "gpt-4.1")
+    criteria_mode_c = str(form.get("criteria_mode", "auto"))
 
     info = project.get_prompt_info(prompt_id)
     versions = project.list_prompt_versions(prompt_id)
@@ -2252,11 +2282,23 @@ async def compare_start(request: Request, prompt_id: str):
         "step1_skipped": True,
         "criteria_source_version": reuse_from_version,
         "criteria_source_run_hash": reuse_run_hash,
+        "criteria_mode": criteria_mode_c,
         "created_at": datetime.now(_tz3.utc).isoformat(),
     }
     (compare_dir / "compare_meta.json").write_text(
         _json.dumps(compare_meta, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+
+    # criteria 직접 작성 모드: 빈 judge.yaml 생성
+    if criteria_mode_c == "manual" and not reuse_run_hash:
+        import yaml as _yaml_c
+        comp_dir_c = compare_dir / "judge_components"
+        comp_dir_c.mkdir(parents=True, exist_ok=True)
+        blank_c = {"criteria": "", "few_shot": [], "judge_type": "pairwise"}
+        (comp_dir_c / "judge.yaml").write_text(
+            _yaml_c.dump(blank_c, allow_unicode=True, default_flow_style=False, sort_keys=False),
+            encoding="utf-8",
+        )
 
     return RedirectResponse(
         f"/prompts/{prompt_id}/compare/{compare_hash}/step2", status_code=303
@@ -2342,6 +2384,42 @@ def compare_step2_status(compare_hash: str):
 def compare_step2_stop(prompt_id: str, compare_hash: str):
     key = _compare_step_key(compare_hash, 2)
     stop_step(key, "", "", 2)
+    return RedirectResponse(
+        f"/prompts/{prompt_id}/compare/{compare_hash}/step2", status_code=303
+    )
+
+
+@app.post("/prompts/{prompt_id}/compare/{compare_hash}/step2/criteria/save")
+async def compare_step2_criteria_save(request: Request, prompt_id: str, compare_hash: str):
+    import yaml as _yaml
+    from datetime import datetime as _dt
+
+    form = await request.form()
+    new_criteria = form.get("criteria", "").strip()
+    if not new_criteria:
+        return RedirectResponse(
+            f"/prompts/{prompt_id}/compare/{compare_hash}/step2", status_code=303
+        )
+
+    project = get_project()
+    run_dir = _compare_run_dir(project, prompt_id, compare_hash)
+    comp_dir = run_dir / "judge_components"
+    comp_dir.mkdir(parents=True, exist_ok=True)
+
+    existing = load_step2_yaml(run_dir) or {}
+    existing["criteria"] = new_criteria
+
+    ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+    ts_path = comp_dir / f"{prompt_id}_judge_{ts}.yaml"
+    ts_path.write_text(
+        _yaml.dump(existing, allow_unicode=True, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+    canonical = comp_dir / "judge.yaml"
+    canonical.write_text(
+        _yaml.dump(existing, allow_unicode=True, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
     return RedirectResponse(
         f"/prompts/{prompt_id}/compare/{compare_hash}/step2", status_code=303
     )

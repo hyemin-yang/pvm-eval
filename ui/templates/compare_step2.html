@@ -47,6 +47,15 @@
   </div>
 
   <div class="bg-white border border-gray-200 rounded-xl p-6">
+    {% if criteria_mode == 'manual' %}
+    <div class="flex items-center gap-3 mb-4">
+      <div>
+        <h2 class="text-lg font-semibold">Criteria 직접 작성</h2>
+        <p class="text-sm text-gray-500 mt-0.5">에러 분석 없이 pairwise 비교 기준을 직접 입력합니다. 저장 후 Step 3으로 이동합니다.</p>
+      </div>
+      <span class="ml-auto text-xs px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full font-medium whitespace-nowrap">에러 분석 건너뜀</span>
+    </div>
+    {% else %}
     <div class="flex items-center justify-between mb-4">
       <div>
         <h2 class="text-lg font-semibold">Judge 프롬프트 생성</h2>
@@ -68,6 +77,7 @@
       </form>
       {% endif %}
     </div>
+    {% endif %}
 
     {% if is_running %}
 
@@ -90,13 +100,13 @@
                   h-56 overflow-auto whitespace-pre-wrap leading-relaxed">{{ run_log or '로그를 기다리는 중...' }}</pre>
     </div>
 
-    {% elif result %}
+    {% elif result or criteria_mode == 'manual' %}
 
-    {% set few_shots = result.get('few_shot', []) %}
-    {% set criteria_text = result.get('criteria', '') %}
+    {% set few_shots = (result.get('few_shot', []) if result else []) %}
+    {% set criteria_text = (result.get('criteria', '') if result else '') %}
     {% set criteria_count = criteria_text.split('### ') | length - 1 %}
 
-    {% if run_log %}
+    {% if run_log and criteria_mode != 'manual' %}
     <details class="mb-6">
       <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">
         마지막 실행 로그 보기
@@ -106,6 +116,7 @@
     </details>
     {% endif %}
 
+    {% if criteria_mode != 'manual' %}
     <div class="grid grid-cols-3 gap-3 mb-6">
       <div class="bg-gray-50 rounded-lg p-3 text-center">
         <div class="text-2xl font-bold text-indigo-600">{{ criteria_count }}</div>
@@ -120,8 +131,35 @@
         <div class="text-xs text-gray-500 mt-1">Judge 유형</div>
       </div>
     </div>
+    {% endif %}
 
-    {% if criteria_text %}
+    {% if criteria_mode == 'manual' %}
+    <!-- 직접 작성 모드: 에디터 바로 표시 -->
+    <div class="mb-6">
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">비교 Criteria 작성</h3>
+      <p class="text-xs text-gray-400 mb-3">Judge가 Response A와 B를 비교할 기준을 직접 작성합니다.</p>
+      <form method="post" action="{{ compare_url_base }}/step2/criteria/save">
+        <textarea name="criteria" id="criteria-textarea"
+                  class="w-full text-xs font-mono bg-white border border-indigo-300 rounded-lg p-4
+                         h-72 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400
+                         text-gray-700 leading-relaxed"
+                  placeholder="### 비교 기준 1&#10;...&#10;&#10;### 비교 기준 2&#10;...">{{ criteria_text }}</textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button type="submit"
+                  class="px-4 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg
+                         hover:bg-indigo-500 transition">
+            저장
+          </button>
+          <a href="{{ compare_url_base }}/step3"
+             class="px-4 py-1.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg
+                    hover:bg-gray-200 transition">
+            Step 3: Judge 실행 →
+          </a>
+          <span class="text-xs text-gray-400 ml-1">저장 후 Step 3으로 이동하세요.</span>
+        </div>
+      </form>
+    </div>
+    {% elif criteria_text %}
     <div class="mb-6">
       <h3 class="text-sm font-semibold text-gray-700 mb-2">비교 Criteria</h3>
       <pre class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-4
