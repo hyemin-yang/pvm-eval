@@ -28,7 +28,7 @@ Python 3.11 이상이 필요합니다.
 ```bash
 # 로컬 클론 후 설치
 git clone https://github.com/hyemin-yang/pvm-eval.git
-cd pvm-eval/prompt_versioning_manager
+cd pvm-eval
 pipx install .
 
 # GitHub에서 직접 설치
