@@ -35,6 +35,49 @@ pipx install .
 pipx install "git+https://github.com/hyemin-yang/pvm-eval.git@main#subdirectory=prompt_versioning_manager"
 ```
 
+---
+
+## 빠른 시작
+
+```bash
+mkdir my-project && cd my-project
+pvm init
+pvm ui
+```
+
+기본 템플릿 확인:
+
+```bash
+pvm template
+```
+
+예시 `prompt.yaml`:
+
+```yaml
+id: {prompt_id}
+description: 사용자 의도를 분류하는 프롬프트
+author: alice
+
+llm:
+  provider: openai
+  model: gpt-5.4
+
+prompt: |
+  사용자의 입력을 보고 의도를 분류하세요.
+```
+
+프롬프트 추가 → 배포 → 조회 사용 예시:
+
+```bash
+pvm add prompt.yaml          # 0.1.0 버전 생성
+pvm add prompt.yaml --minor  # 0.2.0
+pvm add prompt.yaml --major  # 1.0.0
+pvm deploy {prompt_id}
+pvm get {prompt_id}
+```
+
+---
+
 ### API 키 설정
 
 Judge 평가 기능을 사용하려면 Anthropic, OpenAI, 또는 Google Gemini API 키가 필요합니다.
@@ -56,49 +99,9 @@ GEMINI_API_KEY=AIza...
 
 ---
 
-## 빠른 시작
-
-```bash
-mkdir my-project && cd my-project
-pvm init
-```
-
-기본 템플릿 확인:
-
-```bash
-pvm template
-```
-
-예시 `prompt.yaml`:
-
-```yaml
-id: intent_classifier
-description: 사용자 의도를 분류하는 프롬프트
-author: alice
-
-llm:
-  provider: openai
-  model: gpt-5.4
-
-prompt: |
-  사용자의 입력을 보고 의도를 분류하세요.
-```
-
-프롬프트 추가 → 배포 → 조회:
-
-```bash
-pvm add prompt.yaml          # 0.1.0 버전 생성
-pvm add prompt.yaml --minor  # 0.2.0
-pvm add prompt.yaml --major  # 1.0.0
-pvm deploy intent_classifier
-pvm get intent_classifier
-```
-
----
-
 ## 사용 방법
 
-이하 기능들은 **웹 UI**, **Claude Skills**, **CLI 명령어** 세 가지 방법으로 이용할 수 있습니다.
+프롬프트 추가, 배포, 조회와 이하 기능들은 **웹 UI**, **Claude Skills**, **CLI 명령어** 세 가지 방법으로 이용할 수 있습니다.
 
 ---
 
