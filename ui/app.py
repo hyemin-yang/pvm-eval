@@ -18,7 +18,7 @@ from pvm.storage.history import read_history
 from pvm.storage.yaml_io import dump_yaml
 
 from .eval_runner import (
-    get_pipeline_dir, get_run_status, get_step_status, is_configured, is_running,
+    get_pipeline_dir, get_run_status, get_step_status, init_log_dir, is_configured, is_running,
     load_json, load_log, load_step2_yaml, patch_config_for_pvm,
     run_step0_sync, set_pipeline_dir, start_step_async, stop_step,
 )
@@ -2902,6 +2902,7 @@ def run(
 
     global _project
     _project = PVMProject(root)
+    init_log_dir(_project.root)
     # eval_pipeline_dir 인자는 하위 호환성을 위해 유지하지만 번들된 파이프라인 사용
     print(f"eval pipeline: bundled ({get_pipeline_dir()})")
 

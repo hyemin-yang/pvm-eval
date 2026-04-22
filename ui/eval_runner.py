@@ -6,6 +6,7 @@ eval-ui의 pipeline_runner.py에 대응하는 PVM 내장 버전.
 """
 from __future__ import annotations
 
+import getpass
 import json
 import os
 import subprocess
@@ -21,8 +22,23 @@ from pvm.eval_pipeline.pvm_storage import select_judge_component_file
 # ── 전역 상태 ────────────────────────────────────────────────────────────────
 
 _running_jobs: dict[str, tuple[subprocess.Popen, IO]] = {}
-_log_dir: Path = Path(tempfile.gettempdir()) / "pvm_eval_logs"
-_log_dir.mkdir(parents=True, exist_ok=True)
+_log_dir: Path | None = None  # init_log_dir() 호출 전까지 None
+
+
+def init_log_dir(project_root: Path) -> None:
+    """프로젝트 루트가 확정된 후 app.py에서 호출."""
+    global _log_dir
+    _log_dir = project_root / ".pvm" / "eval_logs"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _get_log_dir() -> Path:
+    """_log_dir 미초기화 시 /tmp fallback."""
+    if _log_dir is not None:
+        return _log_dir
+    fallback = Path(tempfile.gettempdir()) / f"pvm_eval_logs_{getpass.getuser()}"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
 
 SCRIPTS = {
     0: "step0_generate_config.py",
@@ -56,7 +72,7 @@ def _job_key(prompt_id: str, version: str, pipeline_hash: str, step: int) -> str
 
 
 def _log_path(prompt_id: str, version: str, pipeline_hash: str, step: int) -> Path:
-    return _log_dir / f"{_job_key(prompt_id, version, pipeline_hash, step)}.log"
+    return _get_log_dir() / f"{_job_key(prompt_id, version, pipeline_hash, step)}.log"
 
 
 def _python_executable() -> str:
